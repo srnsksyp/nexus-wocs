@@ -61,7 +61,9 @@ export const ProjectSettingsDialog = ({
           <DialogHeader>
             <div className="flex items-center gap-2">
               <SettingsIcon className="size-5 text-muted-foreground" />
-              <DialogTitle>Project Settings</DialogTitle>
+              <DialogTitle tabIndex={-1} data-dialog-autofocus="">
+                Project Settings
+              </DialogTitle>
             </div>
             <DialogDescription>
               Manage settings and configuration for {project?.name ?? "this project"}.

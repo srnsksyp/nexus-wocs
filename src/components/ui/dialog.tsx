@@ -51,10 +51,64 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const previouslyFocusedElementRef = React.useRef<HTMLElement | null>(null)
+
+  const handleOpenAutoFocus: NonNullable<
+    React.ComponentProps<typeof DialogPrimitive.Content>["onOpenAutoFocus"]
+  > = (event) => {
+    const content = event.currentTarget as HTMLElement
+    const activeElement = content.ownerDocument.activeElement
+
+    previouslyFocusedElementRef.current =
+      activeElement instanceof HTMLElement &&
+      activeElement !== content.ownerDocument.body
+        ? activeElement
+        : null
+
+    onOpenAutoFocus?.(event)
+
+    if (event.defaultPrevented) {
+      return
+    }
+
+    const initialFocusTarget = content.querySelector<HTMLElement>(
+      "[data-dialog-autofocus]"
+    )
+
+    if (initialFocusTarget && !initialFocusTarget.hasAttribute("disabled")) {
+      event.preventDefault()
+      initialFocusTarget.focus({ preventScroll: true })
+    }
+  }
+
+  const handleCloseAutoFocus: NonNullable<
+    React.ComponentProps<typeof DialogPrimitive.Content>["onCloseAutoFocus"]
+  > = (event) => {
+    onCloseAutoFocus?.(event)
+
+    const previouslyFocusedElement = previouslyFocusedElementRef.current
+    previouslyFocusedElementRef.current = null
+
+    if (event.defaultPrevented) {
+      return
+    }
+
+    if (
+      previouslyFocusedElement?.isConnected &&
+      !previouslyFocusedElement.hasAttribute("disabled") &&
+      !previouslyFocusedElement.closest("[inert]")
+    ) {
+      event.preventDefault()
+      previouslyFocusedElement.focus({ preventScroll: true })
+    }
+  }
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -64,6 +118,8 @@ function DialogContent({
           "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           className
         )}
+        onOpenAutoFocus={handleOpenAutoFocus}
+        onCloseAutoFocus={handleCloseAutoFocus}
         {...props}
       >
         {children}

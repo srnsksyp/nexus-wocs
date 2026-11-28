@@ -16,7 +16,16 @@ vi.mock("@/features/projects/components/projects-command-dialog", () => ({
     onOpenChange: (open: boolean) => void;
   }) => {
     mockCommandDialogOpen = open;
-    return open ? <div data-testid="dialog-command">Command Dialog</div> : null;
+    return open ? (
+      <div
+        role="dialog"
+        data-slot="dialog-content"
+        data-state="open"
+        data-testid="dialog-command"
+      >
+        Command Dialog
+      </div>
+    ) : null;
   },
 }));
 
@@ -28,7 +37,16 @@ vi.mock("@/features/projects/components/import-github-dialog", () => ({
     onOpenChange: (open: boolean) => void;
   }) => {
     mockImportDialogOpen = open;
-    return open ? <div data-testid="dialog-import">Import Dialog</div> : null;
+    return open ? (
+      <div
+        role="dialog"
+        data-slot="dialog-content"
+        data-state="open"
+        data-testid="dialog-import"
+      >
+        Import Dialog
+      </div>
+    ) : null;
   },
 }));
 
@@ -40,7 +58,16 @@ vi.mock("@/features/projects/components/new-project-dialog", () => ({
     onOpenChange: (open: boolean) => void;
   }) => {
     mockNewProjectDialogOpen = open;
-    return open ? <div data-testid="dialog-new-project">New Project Dialog</div> : null;
+    return open ? (
+      <div
+        role="dialog"
+        data-slot="dialog-content"
+        data-state="open"
+        data-testid="dialog-new-project"
+      >
+        New Project Dialog
+      </div>
+    ) : null;
   },
 }));
 
@@ -199,6 +226,28 @@ describe("ProjectsView keyboard shortcuts", () => {
     expect(removeEventListenerSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
     removeEventListenerSpy.mockRestore();
   });
+
+  it("does not open another project dialog while a modal is already open", () => {
+    render(<ProjectsView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "View all" }));
+    expect(mockCommandDialogOpen).toBe(true);
+
+    const openDialog = screen.getByTestId("dialog-command");
+    let defaultPrevented = false;
+    act(() => {
+      defaultPrevented = !fireEvent.keyDown(openDialog, {
+        key: "i",
+        ctrlKey: true,
+      });
+    });
+
+    expect(defaultPrevented).toBe(false);
+    expect(mockCommandDialogOpen).toBe(true);
+    expect(mockImportDialogOpen).toBe(false);
+    expect(screen.queryByTestId("dialog-import")).toBeNull();
+  });
+
 
   describe("Issue #115 — Ignore editable fields when handling project keyboard shortcuts", () => {
     const shortcuts = [
