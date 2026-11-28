@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
+import { HTTPError } from "ky";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -147,7 +148,7 @@ describe("GitHub import dialog", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Unable to import repository");
     expect(input).toHaveValue(url);
-    expect(input).toBeEnabled();
+    await waitFor(() => expect(input).toBeEnabled());
     expect(screen.getByRole("button", { name: "Import" })).toBeEnabled();
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(mockToast.error).not.toHaveBeenCalled();
@@ -174,6 +175,7 @@ describe("GitHub import dialog", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to import repository");
     expect(input).toHaveValue(url);
+    await waitFor(() => expect(input).toBeEnabled());
 
     fireEvent.click(screen.getByRole("button", { name: "Import" }));
     await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(2));
@@ -193,7 +195,7 @@ describe("GitHub import dialog", () => {
       json: vi.fn().mockResolvedValue({ error: "GitHub not connected" }),
     } as unknown as Response;
     mockPost.mockReturnValueOnce({
-      json: vi.fn().mockRejectedValue({ name: "HTTPError", response }),
+      json: vi.fn().mockRejectedValue(new HTTPError(response)),
     });
 
     render(<ImportGithubDialog open onOpenChange={onOpenChange} />);
@@ -203,7 +205,7 @@ describe("GitHub import dialog", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Your GitHub account is not connected");
     expect(screen.getByRole("button", { name: "Connect GitHub" })).toBeInTheDocument();
-    expect(input).toBeEnabled();
+    await waitFor(() => expect(input).toBeEnabled());
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
