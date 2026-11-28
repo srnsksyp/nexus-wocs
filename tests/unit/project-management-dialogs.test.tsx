@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
+import { HTTPError } from "ky";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -132,15 +133,101 @@ describe("GitHub import dialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("reports an import mutation failure", async () => {
-    mockPost.mockRejectedValueOnce(new Error("import failed"));
-    render(<ImportGithubDialog open onOpenChange={vi.fn()} />);
+  it("keeps the dialog open, shows an accessible error, and preserves the URL after failure", async () => {
+    const onOpenChange = vi.fn();
+    mockPost.mockReturnValueOnce({
+      json: vi.fn().mockRejectedValue(new Error("import failed")),
+    });
+    render(<ImportGithubDialog open onOpenChange={onOpenChange} />);
+
+    const input = screen.getByLabelText("Repository URL");
+    const url = "https://github.com/owner/repo";
+    fireEvent.change(input, { target: { value: url } });
+    fireEvent.submit(input.closest("form")!);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Unable to import repository");
+    expect(alert).toHaveAttribute("id", "github-import-request-error");
+    expect(input).toHaveAttribute("aria-describedby", "github-import-request-error");
+    expect(input).toHaveValue(url);
+    await waitFor(() => expect(input).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Import" })).toBeEnabled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(mockToast.error).not.toHaveBeenCalled();
+  });
+
+  it("clears the previous error on retry and follows the success flow", async () => {
+    const onOpenChange = vi.fn();
+    let resolveImport: ((value: unknown) => void) | undefined;
+    mockPost
+      .mockReturnValueOnce({
+        json: vi.fn().mockRejectedValue(new Error("first attempt failed")),
+      })
+      .mockReturnValueOnce({
+        json: () => new Promise((resolve) => {
+          resolveImport = resolve;
+        }),
+      });
+
+    render(<ImportGithubDialog open onOpenChange={onOpenChange} />);
+    const input = screen.getByLabelText("Repository URL");
+    const url = "https://github.com/owner/repo";
+    fireEvent.change(input, { target: { value: url } });
+    fireEvent.submit(input.closest("form")!);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to import repository");
+    expect(input).toHaveValue(url);
+    await waitFor(() => expect(input).toBeEnabled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(input).toBeDisabled();
+    expect(input).toHaveValue(url);
+
+    resolveImport?.({ projectId: "project_imported" });
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/projects/project_imported"));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps GitHub connection failures inside the dialog with a connect action", async () => {
+    const onOpenChange = vi.fn();
+    const response = {
+      json: vi.fn().mockResolvedValue({ error: "GitHub not connected" }),
+    } as unknown as Response;
+    mockPost.mockReturnValueOnce({
+      json: vi.fn().mockRejectedValue(new HTTPError(response)),
+    });
+
+    render(<ImportGithubDialog open onOpenChange={onOpenChange} />);
     const input = screen.getByLabelText("Repository URL");
     fireEvent.change(input, { target: { value: "https://github.com/owner/repo" } });
     fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith(
-      "Unable to import repository. Please check the URL and try again",
-    ));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your GitHub account is not connected");
+    const connectButton = screen.getByRole("button", { name: "Connect GitHub" });
+    expect(connectButton).toBeInTheDocument();
+    fireEvent.click(connectButton);
+    expect(mockOpenUserProfile).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(input).toBeEnabled());
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("allows cancellation after a failed import", async () => {
+    const onOpenChange = vi.fn();
+    mockPost.mockReturnValueOnce({
+      json: vi.fn().mockRejectedValue(new Error("import failed")),
+    });
+    render(<ImportGithubDialog open onOpenChange={onOpenChange} />);
+
+    const input = screen.getByLabelText("Repository URL");
+    fireEvent.change(input, { target: { value: "https://github.com/owner/repo" } });
+    fireEvent.submit(input.closest("form")!);
+    await screen.findByRole("alert");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
 
