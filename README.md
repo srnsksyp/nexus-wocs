@@ -241,28 +241,30 @@ Covers end-to-end subsystem integration and security regression tests located in
 npm run test:regression
 ```
 
-### Complete Verification Sequence
-Contributors should run the full verification pipeline before submitting changes:
+### Recommended Contributor Preflight
+
+Before opening a pull request, run the complete verification sequence with one command:
 
 ```bash
-# Run all unit and standalone regression tests
-npm run test:all
-
-# Run TypeScript compilation and typecheck
-npm run typecheck
-
-# Run full project ESLint
-npm run lint
-
-# Build production application
-npm run build
+npm run preflight
 ```
 
+The command runs these checks sequentially and stops at the first failure:
+
+1. `npm test` — Vitest unit tests.
+2. `npm run test:regression` — standalone Node regression tests.
+3. `npm run typecheck` — TypeScript validation.
+4. `npm run lint` — full-project ESLint.
+5. `npm run build` — production build.
+
+The preflight runner invokes npm's JavaScript CLI through the active Node executable, rather than relying on shell command chaining. The same command works in Windows PowerShell, Windows Command Prompt, macOS, and Linux.
+
+For faster iteration, individual checks remain available: `npm test`, `npm run test:regression`, `npm run typecheck`, `npm run lint`, and `npm run build`. The shorter `npm run test:all` command continues to run only the unit and regression suites.
+
 > [!NOTE]
-> All test commands are cross-platform compatible and work identically across Windows PowerShell, Windows Command Prompt, macOS, and Linux. For detailed documentation on test classifications and special-runtime test suites, see [CONTRIBUTING.md](CONTRIBUTING.md) and [tests/README.md](tests/README.md).
+> The preflight covers the standard contributor checks. Special-runtime integration tests documented in [tests/README.md](tests/README.md) remain separate and should be run when working on those subsystems. See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
 
 ---
-
 ## 🔧 Troubleshooting Common Issues
 
 ### 1. `NEXUS_CONVEX_INTERNAL_KEY is not configured` or `Invalid internal key`
