@@ -226,7 +226,7 @@ export const ProjectsList = ({ onViewAll }: ProjectsListProps) => {
             data={continueProject}
             onDelete={(proj) => setProjectToDelete(proj)}
             onSelect={setSelectedProjectId}
-            isSelected={selectedProject !== null}
+            isSelected={Boolean(selectedProjectId && selectedProject)}
           />
         ) : null}
         {recentProjects.length > 0 && (

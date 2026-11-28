@@ -41,7 +41,7 @@ vi.mock("@/components/ui/button", () => ({
     children: React.ReactNode;
   }) => {
     if (asChild && React.isValidElement(children)) {
-      return React.cloneElement(children as React.ReactElement, props);
+      return React.cloneElement(children as React.ReactElement, props as never);
     }
     return <button {...props}>{children}</button>;
   },
@@ -142,6 +142,7 @@ describe("selected project navigation (Issue #141)", () => {
 
   it("preserves the chosen project when navigating list → project → list", async () => {
     const firstList = render(<ProjectsList onViewAll={vi.fn()} />);
+    expect(screen.getByText("Last updated")).toBeInTheDocument();
     const betaLink = screen.getByRole("link", { name: /Beta workspace/ });
     expect(betaLink).toHaveAttribute("href", "/projects/project_beta");
 
