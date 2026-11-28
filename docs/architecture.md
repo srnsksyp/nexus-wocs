@@ -11,6 +11,7 @@ Nexus is structured into distinct, decoupled execution layers:
 1. **Frontend Presentation & Editing (Next.js 16 / React 19 / CodeMirror 6):**
    - Single-page application rendering the IDE workbench, code editor, file explorer, preview panel, and conversation sidebar.
    - Code editor integrates dynamic syntax highlighting via [`language-extension.ts`](../src/features/editor/extensions/language-extension.ts) and shared setup via [`custom-setup.ts`](../src/features/editor/extensions/custom-setup.ts). For practical instructions on adding or updating language mappings and running their tests, refer to the [Language Extension Contributor Guide](../CONTRIBUTING.md#adding-or-updating-editor-language-support).
+   - Manages open tabs, preview vs. pinned tab states, 1,500ms debounced autosave, and external conflict detection via Zustand (`useEditorStore`). For a complete breakdown of dirty-state tracking, save failure recovery, conflict banners, and tab closing rules, see the [Editor Tab and Dirty-State Lifecycle Guide](editor-tab-dirty-state-lifecycle.md).
    - Subscribes reactively to Convex queries for immediate state synchronization.
 
 2. **Database & Real-Time Sync (Convex):**
