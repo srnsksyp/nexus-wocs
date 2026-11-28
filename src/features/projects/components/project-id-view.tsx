@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Allotment } from "allotment";
 import { FileIcon } from "@react-symbols/icons/utils";
+import { FileTextIcon, SearchIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { EditorView } from "@/features/editor/components/editor-view";
@@ -11,6 +12,9 @@ import { useFiles } from "@/features/projects/hooks/use-files";
 import { useProject } from "@/features/projects/hooks/use-projects";
 import { useSelectedProjectStore } from "../store/use-selected-project-store";
 import { getFilePath } from "@/features/preview/utils/file-tree";
+import {
+  searchFilesByContent,
+} from "../utils/content-search";
 import {
   CommandDialog,
   CommandEmpty,
@@ -74,7 +78,9 @@ export const ProjectIdView = ({
   const [activeView, setActiveView] = useState<"editor" | "preview">("editor");
   const [quickOpen, setQuickOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<"path" | "content">("path");
   const [prevProjectId, setPrevProjectId] = useState(projectId);
+  const [isPending, startTransition] = useTransition();
 
   const editorTabRef = useRef<HTMLDivElement | null>(null);
   const previewTabRef = useRef<HTMLDivElement | null>(null);
@@ -101,6 +107,7 @@ export const ProjectIdView = ({
     setPrevProjectId(projectId);
     setQuickOpen(false);
     setSearchQuery("");
+    setSearchMode("path");
   }
 
   // Keyboard shortcut: Ctrl+P / Cmd+P to toggle quick open
@@ -166,6 +173,31 @@ export const ProjectIdView = ({
       })
       .sort((a, b) => a.path.localeCompare(b.path));
   }, [files]);
+
+  // Determine active search mode based on explicit toggle or query prefix (@ or text:)
+  const isPrefixContentSearch =
+    searchQuery.startsWith("@") ||
+    searchQuery.toLowerCase().startsWith("text:") ||
+    searchQuery.startsWith("?");
+  const activeSearchMode: "path" | "content" =
+    searchMode === "content" || isPrefixContentSearch ? "content" : "path";
+
+  // Normalized content query string (strips syntax prefix if present)
+  const normalizedContentQuery = useMemo(() => {
+    if (searchQuery.startsWith("@") || searchQuery.startsWith("?")) {
+      return searchQuery.slice(1);
+    }
+    if (searchQuery.toLowerCase().startsWith("text:")) {
+      return searchQuery.slice(5);
+    }
+    return searchQuery;
+  }, [searchQuery]);
+
+  // Compute content search results when in content mode
+  const contentSearchResults = useMemo(() => {
+    if (activeSearchMode !== "content") return null;
+    return searchFilesByContent(files, normalizedContentQuery);
+  }, [activeSearchMode, files, normalizedContentQuery]);
 
   const handleSelectFile = (fileId: Id<"files">) => {
     openFile(fileId, { pinned: false });
@@ -283,23 +315,125 @@ export const ProjectIdView = ({
         open={quickOpen}
         onOpenChange={(open) => {
           setQuickOpen(open);
-          if (!open) setSearchQuery("");
+          if (!open) {
+            setSearchQuery("");
+            setSearchMode("path");
+          }
         }}
         title="Quick Open"
-        description="Search files by name or path"
+        description={
+          activeSearchMode === "content"
+            ? "Search file contents across the project"
+            : "Search files by name or path"
+        }
+        commandProps={{
+          filter: activeSearchMode === "content" ? () => 1 : undefined,
+        }}
       >
+        <div className="flex items-center justify-between px-3 pt-2 pb-1 border-b border-muted/40 bg-muted/20 text-xs">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                startTransition(() => {
+                  setSearchMode("path");
+                  if (searchQuery.startsWith("@") || searchQuery.startsWith("?")) {
+                    setSearchQuery(searchQuery.slice(1));
+                  } else if (searchQuery.toLowerCase().startsWith("text:")) {
+                    setSearchQuery(searchQuery.slice(5));
+                  }
+                });
+              }}
+              className={cn(
+                "px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1",
+                activeSearchMode === "path"
+                  ? "bg-accent text-accent-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <FileTextIcon className="size-3" />
+              <span>Files</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                startTransition(() => {
+                  setSearchMode("content");
+                });
+              }}
+              className={cn(
+                "px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1",
+                activeSearchMode === "content"
+                  ? "bg-accent text-accent-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <SearchIcon className="size-3" />
+              <span>Content</span>
+            </button>
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            {activeSearchMode === "content" ? "Searching file content" : "Tip: prefix with @ or text: to search content"}
+          </span>
+        </div>
+
         <CommandInput
-          placeholder="Search files by name or path..."
+          placeholder={
+            activeSearchMode === "content"
+              ? "Search file contents..."
+              : "Search files by name or path..."
+          }
           value={searchQuery}
-          onValueChange={setSearchQuery}
+          onValueChange={(val) => {
+            startTransition(() => {
+              setSearchQuery(val);
+            });
+          }}
         />
         <CommandList>
-          {fileItems === null ? (
+          {isPending ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Searching...
+            </div>
+          ) : fileItems === null ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
               Loading files...
             </div>
           ) : fileItems.length === 0 ? (
             <CommandEmpty>No files in project.</CommandEmpty>
+          ) : activeSearchMode === "content" ? (
+            !normalizedContentQuery.trim() ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">
+                Type text or symbols to search file contents...
+              </div>
+            ) : contentSearchResults && contentSearchResults.length === 0 ? (
+              <CommandEmpty>No matching content found.</CommandEmpty>
+            ) : (
+              <>
+                <CommandEmpty>No matching content found.</CommandEmpty>
+                <CommandGroup heading={`Matching Content (${contentSearchResults?.length || 0})`}>
+                  {contentSearchResults?.map((res) => (
+                    <CommandItem
+                      key={`${res.id}-${res.lineNumber}-${res.lineContent}`}
+                      value={res.searchValue}
+                      onSelect={() => handleSelectFile(res.id)}
+                      className="flex flex-col items-start gap-1 py-2"
+                    >
+                      <div className="flex items-center gap-2 w-full overflow-hidden">
+                        <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="font-medium text-sm truncate">{res.name}</span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {res.path}:{res.lineNumber}
+                        </span>
+                      </div>
+                      <div className="pl-6 w-full text-xs font-mono text-muted-foreground truncate">
+                        <span className="text-foreground/80">{res.preview}</span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )
           ) : (
             <>
               <CommandEmpty>No matching files found.</CommandEmpty>
