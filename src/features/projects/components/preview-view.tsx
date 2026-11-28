@@ -103,39 +103,14 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
             {previewUrl && <span className="truncate">{previewUrl}</span>}
             {!isLoading && !previewUrl && !error && <span>Ready to preview</span>}
 
-            {status === "running" && (
-              <>
-                {syncError && (
-                  <div
-                    role="status"
-                    className="flex items-center gap-1.5 text-destructive bg-destructive/10 px-2 py-0.5 rounded text-xs font-sans shrink-0"
-                    title={syncError}
-                  >
-                    <AlertTriangleIcon className="size-3 shrink-0" />
-                    <span>Preview may be out of date</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-4 px-1 text-[11px] underline font-medium hover:bg-destructive/20 text-destructive hover:text-destructive"
-                      onClick={resync}
-                      disabled={isSyncing}
-                      title="Retry sync"
-                      aria-label="Retry sync"
-                    >
-                      Retry sync
-                    </Button>
-                  </div>
-                )}
-                {!syncError && isSyncing && (
-                  <div
-                    role="status"
-                    className="flex items-center gap-1.5 text-muted-foreground bg-muted/60 px-2 py-0.5 rounded text-xs font-sans shrink-0"
-                  >
-                    <Loader2Icon className="size-3 animate-spin shrink-0" />
-                    <span>Syncing preview...</span>
-                  </div>
-                )}
-              </>
+            {status === "running" && isSyncing && !syncError && (
+              <div
+                role="status"
+                className="flex items-center gap-1.5 text-muted-foreground bg-muted/60 px-2 py-0.5 rounded text-xs font-sans shrink-0"
+              >
+                <Loader2Icon className="size-3 animate-spin shrink-0" />
+                <span>Syncing preview...</span>
+              </div>
             )}
           </div>
 
@@ -188,6 +163,33 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
           onSave={restart}
         />
       </div>
+
+      {status === "running" && syncError && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="flex flex-wrap items-center gap-2 border-b border-destructive/20 bg-destructive/10 px-3 py-2 text-destructive"
+        >
+          <AlertTriangleIcon className="size-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Preview may be out of date</p>
+            <p className="break-words text-xs">
+              <span className="font-medium">Preview synchronization failed:</span>{" "}
+              {syncError}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={resync}
+            disabled={isSyncing}
+            aria-label="Retry sync"
+          >
+            Retry sync
+          </Button>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0">
         <Group orientation="vertical" className="h-full w-full min-h-0">

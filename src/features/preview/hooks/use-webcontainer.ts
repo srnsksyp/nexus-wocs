@@ -47,6 +47,27 @@ interface UseWebContainerProps {
   };
 }
 
+
+class PreviewSyncError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PreviewSyncError";
+  }
+}
+
+const hasFileSystemErrorCode = (error: unknown, code: string): boolean => {
+  if (error && typeof error === "object" && "code" in error) {
+    if (error.code === code) return true;
+  }
+
+  return error instanceof Error && new RegExp(`\\b${code}\\b`).test(error.message);
+};
+
+const getUserSafeSyncError = (error: unknown): string => {
+  if (error instanceof PreviewSyncError) return error.message;
+  return "Couldn't synchronize the latest project files to the preview.";
+};
+
 export const useWebContainer = ({
   projectId,
   enabled,
@@ -349,7 +370,9 @@ export const useWebContainer = ({
     appendOutput,
   ]);
 
-  // Sync file changes (hot-reload with sequential queue diffing, mkdir, and folder pruning)
+  // Sync file changes through a sequential queue. Failed tasks are caught so
+  // later updates can continue, and the snapshot advances only after all FS
+  // operations for that update have completed successfully.
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !files || status !== "running") return;
@@ -359,7 +382,6 @@ export const useWebContainer = ({
     activeSyncCountRef.current += 1;
     setIsSyncing(true);
 
-    // Chain sync task onto sequential promise queue to guard against concurrent interleaving
     syncQueueRef.current = syncQueueRef.current
       .then(async () => {
         if (!isEffectActive || containerRef.current !== container) return;
@@ -367,7 +389,8 @@ export const useWebContainer = ({
         const currentSnapshot = extractFileTreeSnapshot(files);
         const prevSnapshot = previousSnapshotRef.current;
 
-        // If initial snapshot was not set, set it and return
+        // The mounted snapshot is the baseline; no filesystem mutations are
+        // needed on the first running pass.
         if (
           prevSnapshot.files.size === 0 &&
           prevSnapshot.directories.size === 0
@@ -381,36 +404,46 @@ export const useWebContainer = ({
 
         const diff = computeFileTreeDiff(prevSnapshot, currentSnapshot);
 
-        // 1. Create newly added directories (e.g. empty folders or folders for new files)
+        // Create directories before files. Recursive mkdir is idempotent for
+        // existing directories; other failures mean the preview cannot sync.
         for (const dir of diff.directoriesToCreate) {
           try {
             await container.fs.mkdir(dir, { recursive: true });
           } catch {
-            // Ignore if directory already exists
+            throw new PreviewSyncError(
+              `Couldn't create the folder "${dir}" in the preview.`
+            );
           }
         }
 
-        // 2. Prune files deleted from Convex
+        // Missing paths can already have been removed by an earlier queued
+        // update; ignore only ENOENT and surface every other deletion failure.
         for (const oldPath of diff.filesToDelete) {
           try {
             await container.fs.rm(oldPath, { recursive: true });
-          } catch {
-            // Ignore if file was already removed
+          } catch (removeError) {
+            if (!hasFileSystemErrorCode(removeError, "ENOENT")) {
+              throw new PreviewSyncError(
+                `Couldn't remove the file "${oldPath}" from the preview.`
+              );
+            }
           }
         }
 
-        // 3. Prune deleted directories (deepest first to cleanly remove nested empty folders)
         for (const dirPath of diff.directoriesToDelete) {
           try {
             await container.fs.rm(dirPath, { recursive: true });
-          } catch {
-            // Ignore if directory was already removed
+          } catch (removeError) {
+            if (!hasFileSystemErrorCode(removeError, "ENOENT")) {
+              throw new PreviewSyncError(
+                `Couldn't remove the folder "${dirPath}" from the preview.`
+              );
+            }
           }
         }
 
-        // 4. Write new or modified files (ensuring directories exist)
-        let writeFailed = false;
-        let lastWriteError: unknown = null;
+        // Write sequentially and stop on the first failure. The unchanged
+        // snapshot makes the failed change eligible for the next retry/update.
         for (const { path: filePath, content } of diff.filesToWrite) {
           const dir = filePath.includes("/")
             ? filePath.substring(0, filePath.lastIndexOf("/"))
@@ -420,38 +453,34 @@ export const useWebContainer = ({
             try {
               await container.fs.mkdir(dir, { recursive: true });
             } catch {
-              // Ignore if directory already exists
+              throw new PreviewSyncError(
+                `Couldn't create the folder "${dir}" in the preview.`
+              );
             }
           }
 
           try {
             await container.fs.writeFile(filePath, content);
-          } catch (writeErr) {
-            console.error(`[WebContainer] Failed to sync ${filePath}:`, writeErr);
-            writeFailed = true;
-            lastWriteError = writeErr;
+          } catch {
+            throw new PreviewSyncError(
+              `Couldn't write the file "${filePath}" to the preview.`
+            );
           }
         }
 
-        if (writeFailed) {
-          throw lastWriteError || new Error("Failed to write updated files to container");
-        }
-
         if (isEffectActive) {
+          // Do not advance on partial failure: future updates must retry every
+          // change that was not confirmed as synchronized.
           previousSnapshotRef.current = currentSnapshot;
           if (currentSyncSeq >= syncSequenceRef.current) {
             setSyncError(null);
           }
         }
       })
-      .catch((err) => {
-        console.error("[WebContainer] File synchronization error:", err);
+      .catch((syncError) => {
+        console.error("[WebContainer] File synchronization error:", syncError);
         if (isEffectActive && currentSyncSeq >= syncSequenceRef.current) {
-          setSyncError(
-            err instanceof Error && err.message
-              ? err.message
-              : "Failed to synchronize files with preview",
-          );
+          setSyncError(getUserSafeSyncError(syncError));
         }
       })
       .finally(() => {
