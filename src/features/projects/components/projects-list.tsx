@@ -56,14 +56,18 @@ const ContinueCard = ({
   data,
   onDelete,
   onSelect,
+  isSelected,
 }: {
   data: Doc<"projects">;
   onDelete: (project: Doc<"projects">) => void;
   onSelect: (projectId: Id<"projects">) => void;
+  isSelected: boolean;
 }) => {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs text-muted-foreground">Last updated</span>
+      <span className="text-xs text-muted-foreground">
+        {isSelected ? "Selected project" : "Last updated"}
+      </span>
       <div className="relative group/card flex items-stretch border bg-background">
         <Button
           variant="ghost"
@@ -73,6 +77,7 @@ const ContinueCard = ({
           <Link
             href={`/projects/${data._id}`}
             onClick={() => onSelect(data._id)}
+            aria-current={isSelected ? "page" : undefined}
             className="group flex-1 w-full"
           >
             <div className="flex items-center justify-between w-full">
@@ -221,6 +226,7 @@ export const ProjectsList = ({ onViewAll }: ProjectsListProps) => {
             data={continueProject}
             onDelete={(proj) => setProjectToDelete(proj)}
             onSelect={setSelectedProjectId}
+            isSelected={selectedProject !== null}
           />
         ) : null}
         {recentProjects.length > 0 && (
