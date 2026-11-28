@@ -125,6 +125,7 @@ export const ImportGithubDialog = ({
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
                         aria-invalid={isInvalid}
+                        data-dialog-autofocus=""
                         aria-describedby={requestError ? "github-import-request-error" : undefined}
                         disabled={isSubmitting}
                         placeholder="https://github.com/owner/repo"

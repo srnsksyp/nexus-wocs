@@ -82,7 +82,10 @@ export const ProjectsCommandDialog = ({
         title="Search Projects"
         description="Search and navigate to your projects"
       >
-        <CommandInput placeholder="Search projects..." />
+        <CommandInput
+          placeholder="Search projects..."
+          data-dialog-autofocus=""
+        />
         <CommandList>
           <CommandEmpty>No projects found.</CommandEmpty>
           <CommandGroup heading="Projects">

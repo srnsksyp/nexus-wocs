@@ -87,6 +87,7 @@ export const NewProjectDialog = ({
               placeholder="Ask Nexus to build..."
               onChange={(e) => setInput(e.target.value)}
               value={input}
+              data-dialog-autofocus=""
               disabled={isSubmitting}
             />
           </PromptInputBody>

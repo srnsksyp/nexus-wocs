@@ -10,6 +10,12 @@ const mockPush = vi.fn();
 const mockToast = { error: vi.fn(), success: vi.fn() };
 const mockOpenUserProfile = vi.fn();
 const mockRenameProject = vi.fn();
+const mockDeleteProject = vi.fn();
+let currentProjects: Array<{
+  _id: string;
+  name: string;
+  importStatus: "completed" | "failed" | "importing" | "pending";
+}> = [];
 
 vi.mock("ky", () => ({
   default: { post: (...args: unknown[]) => mockPost(...args) },
@@ -32,11 +38,15 @@ let currentProject = { _id: "project_1", name: "Current project", updatedAt: 1 }
 vi.mock("@/features/projects/hooks/use-projects", () => ({
   useProject: () => currentProject,
   useRenameProject: () => mockRenameProject,
+  useProjects: () => currentProjects,
+  useDeleteProject: () => mockDeleteProject,
 }));
 
 import { NewProjectDialog } from "@/features/projects/components/new-project-dialog";
 import { ImportGithubDialog } from "@/features/projects/components/import-github-dialog";
 import { Navbar } from "@/features/projects/components/navbar";
+import { ProjectsCommandDialog } from "@/features/projects/components/projects-command-dialog";
+import { ProjectSettingsDialog } from "@/features/projects/components/project-settings-dialog";
 
 const settleKy = (value: unknown) => ({ json: vi.fn().mockResolvedValue(value) });
 
@@ -49,6 +59,7 @@ describe("project creation", () => {
   it("submits the trimmed prompt with the correct payload and navigates", async () => {
     render(<NewProjectDialog open onOpenChange={vi.fn()} />);
     const input = screen.getByPlaceholderText("Ask Nexus to build...");
+    expect(input).toHaveFocus();
     fireEvent.change(input, { target: { value: "  Build a dashboard  " } });
     fireEvent.submit(input.closest("form")!);
 
@@ -97,6 +108,7 @@ describe("GitHub import dialog", () => {
     async (url) => {
       render(<ImportGithubDialog open onOpenChange={vi.fn()} />);
       const input = screen.getByLabelText("Repository URL");
+      expect(input).toHaveFocus();
       fireEvent.change(input, { target: { value: url } });
       fireEvent.submit(input.closest("form")!);
       await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/api/github/import", { json: { url } }));
@@ -275,5 +287,35 @@ describe("project rename", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(mockRenameProject).toHaveBeenCalledTimes(1);
     expect(input).toBeDisabled();
+  });
+});
+
+describe("project dialog initial focus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    currentProject = { _id: "project_1", name: "Current project", updatedAt: 1 };
+    currentProjects = [];
+  });
+
+  it("focuses the project command search input", async () => {
+    render(<ProjectsCommandDialog open onOpenChange={vi.fn()} />);
+    const search = await screen.findByRole("combobox");
+    expect(search).toHaveAttribute("placeholder", "Search projects...");
+    expect(search).toHaveFocus();
+  });
+
+  it("focuses the project settings heading", async () => {
+    render(
+      <ProjectSettingsDialog
+        projectId={"project_1" as never}
+        open
+        onOpenChange={vi.fn()}
+      />
+    );
+    const heading = await screen.findByRole("heading", {
+      name: "Project Settings",
+    });
+    expect(heading).toHaveAttribute("tabindex", "-1");
+    expect(heading).toHaveFocus();
   });
 });

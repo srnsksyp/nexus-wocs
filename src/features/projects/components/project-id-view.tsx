@@ -107,6 +107,15 @@ export const ProjectIdView = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        // Do not open quick search behind an already active modal dialog.
+        if (
+          document.querySelector(
+            '[data-slot="dialog-content"][data-state="open"], [data-slot="alert-dialog-content"][data-state="open"]'
+          )
+        ) {
+          return;
+        }
+
         // Protect input fields, textareas, contenteditable elements, and CodeMirror editors
         const target = e.target;
         if (target && target instanceof Element) {

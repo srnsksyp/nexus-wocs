@@ -87,6 +87,14 @@ export const ProjectsView = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
+        if (
+          document.querySelector(
+            '[data-slot="dialog-content"][data-state="open"], [data-slot="alert-dialog-content"][data-state="open"]'
+          )
+        ) {
+          return;
+        }
+
         if (isEditableElement(e.target)) {
           return;
         }
