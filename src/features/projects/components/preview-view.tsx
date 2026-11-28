@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Allotment } from "allotment";
+import { Group, Panel, Separator } from "react-resizable-panels";
 import {
   Loader2Icon,
   TerminalSquareIcon,
@@ -11,6 +11,7 @@ import {
   CircleStopIcon,
   CopyIcon,
   ExternalLinkIcon,
+  GripHorizontalIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -189,8 +190,8 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
       </div>
 
       <div className="flex-1 min-h-0">
-        <Allotment vertical>
-          <Allotment.Pane>
+        <Group orientation="vertical" className="h-full w-full min-h-0">
+          <Panel defaultSize={showTerminal ? "65%" : "100%"} minSize="120px" className="min-h-0">
             {error && (
               <div className="size-full flex items-center justify-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-2 max-w-md mx-auto text-center">
@@ -220,17 +221,29 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
                 title="Preview"
               />
             )}
-          </Allotment.Pane>
+          </Panel>
 
           {showTerminal && (
-            <Allotment.Pane minSize={100} maxSize={500} preferredSize={200}>
+            <>
+              <Separator
+                aria-label="Resize preview and terminal"
+                className="relative z-10 flex h-3 w-full cursor-row-resize touch-none items-center justify-center border-y border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              >
+                <div aria-hidden="true" className="flex h-2 w-10 items-center justify-center rounded-full bg-border">
+                  <GripHorizontalIcon className="size-3.5" />
+                </div>
+              </Separator>
+              <Panel defaultSize="35%" minSize="100px" maxSize="500px" className="min-h-0">
               <div className="h-full flex flex-col bg-background border-t">
-                <div className="h-7 flex items-center justify-between px-3 text-xs text-muted-foreground border-b border-border/50 shrink-0">
-                  <div className="flex items-center gap-1.5">
+                <div
+                  data-testid="terminal-toolbar"
+                  className="min-h-7 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2 py-1 text-xs text-muted-foreground border-b border-border/50 shrink-0"
+                >
+                  <div className="flex min-w-0 items-center gap-1.5">
                     <TerminalSquareIcon className="size-3" />
                     Terminal
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="ml-auto flex shrink-0 items-center gap-1">
                     <Button
                       size="sm"
                       variant="ghost"
@@ -260,9 +273,10 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
                   onClearRef={clearTerminalRef}
                 />
               </div>
-            </Allotment.Pane>
+              </Panel>
+            </>
           )}
-        </Allotment>
+        </Group>
       </div>
     </div>
   );

@@ -25,6 +25,8 @@ export const PreviewTerminal = ({
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const lastLengthRef = useRef(0);
+  const resizeFrameRef = useRef<number | null>(null);
+  const lastDimensionsRef = useRef<{ cols: number; rows: number } | null>(null);
   const onDataRef = useRef(onData);
   const onResizeRef = useRef(onResize);
 
@@ -80,7 +82,9 @@ export const PreviewTerminal = ({
       onDataRef.current?.(data);
     });
 
-    // Helper to safely fit and notify parent of dimension changes
+    // Fit once per animation frame so ResizeObserver and window resize bursts coalesce.
+    // Only report a dimension change when xterm's actual grid changes.
+    lastDimensionsRef.current = null;
     const handleFit = () => {
       if (!containerRef.current || !terminalRef.current || !fitAddonRef.current) {
         return;
@@ -90,26 +94,40 @@ export const PreviewTerminal = ({
         if (clientWidth <= 0 || clientHeight <= 0) return;
 
         fitAddon.fit();
-        if (terminal.cols > 0 && terminal.rows > 0) {
-          onResizeRef.current?.({ cols: terminal.cols, rows: terminal.rows });
-        }
+        const dimensions = { cols: terminal.cols, rows: terminal.rows };
+        if (dimensions.cols <= 0 || dimensions.rows <= 0) return;
+
+        const previous = lastDimensionsRef.current;
+        if (previous?.cols === dimensions.cols && previous.rows === dimensions.rows) return;
+
+        lastDimensionsRef.current = dimensions;
+        onResizeRef.current?.(dimensions);
       } catch {
         // Ignore fit errors when container is momentarily invisible or detaching
       }
     };
 
-    const rafId = requestAnimationFrame(handleFit);
+    const scheduleFit = () => {
+      if (resizeFrameRef.current !== null) return;
+      resizeFrameRef.current = requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        handleFit();
+      });
+    };
 
-    const resizeObserver = new ResizeObserver(() => {
-      handleFit();
-    });
+    scheduleFit();
+
+    const resizeObserver = new ResizeObserver(scheduleFit);
     resizeObserver.observe(containerRef.current);
 
-    window.addEventListener("resize", handleFit);
+    window.addEventListener("resize", scheduleFit);
 
     return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", handleFit);
+      if (resizeFrameRef.current !== null) {
+        cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
+      window.removeEventListener("resize", scheduleFit);
       resizeObserver.disconnect();
       dataDisposable.dispose();
       terminal.dispose();

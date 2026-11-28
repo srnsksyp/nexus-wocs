@@ -8,10 +8,26 @@ let mockClearFn = vi.fn();
 let mockWriteFn = vi.fn();
 let mockDisposeFn = vi.fn();
 let mockFocusFn = vi.fn();
+let mockFitFn = vi.fn();
+let mockTerminalInstances: Array<{ cols: number; rows: number }> = [];
+let mockResizeObserverCallback: (() => void) | null = null;
+const mockAnimationFrames = new Map<number, FrameRequestCallback>();
+let mockAnimationFrameId = 0;
 const mockOnDataFn = vi.fn(() => ({ dispose: vi.fn() }));
+
+const flushAnimationFrames = () => {
+  const callbacks = Array.from(mockAnimationFrames.values());
+  mockAnimationFrames.clear();
+  act(() => {
+    callbacks.forEach((callback) => callback(0));
+  });
+};
 
 vi.mock("@xterm/xterm", () => {
   class MockTerminal {
+    constructor() {
+      mockTerminalInstances.push(this);
+    }
     open = vi.fn();
     loadAddon = vi.fn();
     clear = mockClearFn;
@@ -30,7 +46,7 @@ vi.mock("@xterm/xterm", () => {
 vi.mock("@xterm/addon-fit", () => {
   return {
     FitAddon: vi.fn().mockImplementation(() => ({
-      fit: vi.fn(),
+      fit: mockFitFn,
     })),
   };
 });
@@ -48,11 +64,16 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// Mock allotment and popovers
-vi.mock("allotment", () => ({
-  Allotment: Object.assign(
-    ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    { Pane: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }
+// Mock the v4 panel primitives while preserving their accessible DOM contract.
+vi.mock("react-resizable-panels", () => ({
+  Group: ({ children, className, orientation }: { children: React.ReactNode; className?: string; orientation?: string }) => (
+    <div className={className} data-orientation={orientation}>{children}</div>
+  ),
+  Panel: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={className}>{children}</div>
+  ),
+  Separator: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+    <div role="separator" tabIndex={0} {...props}>{children}</div>
   ),
 }));
 
@@ -106,6 +127,19 @@ describe("Issue #47 — Accessible Clear-Terminal Control", () => {
     mockWriteFn = vi.fn();
     mockDisposeFn = vi.fn();
     mockFocusFn = vi.fn();
+    mockFitFn = vi.fn();
+    mockTerminalInstances = [];
+    mockResizeObserverCallback = null;
+    mockAnimationFrames.clear();
+    mockAnimationFrameId = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      const id = ++mockAnimationFrameId;
+      mockAnimationFrames.set(id, callback);
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+      mockAnimationFrames.delete(id);
+    });
     mockRestart = vi.fn();
     mockTerminalOutput = "";
     mockStatus = "ready";
@@ -114,14 +148,81 @@ describe("Issue #47 — Accessible Clear-Terminal Control", () => {
 
     // Polyfill ResizeObserver for jsdom
     global.ResizeObserver = class ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        mockResizeObserverCallback = () => callback([], this);
+      }
       observe() {}
       unobserve() {}
-      disconnect() {}
-    };
+      disconnect() {
+        mockResizeObserverCallback = null;
+      }
+    } as unknown as typeof ResizeObserver;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    mockAnimationFrames.clear();
+  });
+
+  it("reports changed terminal dimensions once when pane resize notifications are bursty", () => {
+    const onResize = vi.fn();
+    const { container } = render(<PreviewTerminal onResize={onResize} />);
+    const terminalContainer = container.querySelector(".bg-sidebar") as HTMLDivElement;
+
+    Object.defineProperty(terminalContainer, "clientWidth", { configurable: true, value: 800 });
+    Object.defineProperty(terminalContainer, "clientHeight", { configurable: true, value: 400 });
+
+    // Initial fit reports the current grid.
+    flushAnimationFrames();
+    expect(mockFitFn).toHaveBeenCalledTimes(1);
+    expect(onResize).toHaveBeenCalledTimes(1);
+    expect(onResize).toHaveBeenLastCalledWith({ cols: 80, rows: 24 });
+
+    // Several observer notifications for one pane resize collapse into one fit.
+    const terminal = mockTerminalInstances[0];
+    terminal.cols = 120;
+    terminal.rows = 36;
+    act(() => {
+      mockResizeObserverCallback?.();
+      mockResizeObserverCallback?.();
+      mockResizeObserverCallback?.();
+    });
+    expect(mockAnimationFrames.size).toBe(1);
+    flushAnimationFrames();
+
+    expect(mockFitFn).toHaveBeenCalledTimes(2);
+    expect(onResize).toHaveBeenCalledTimes(2);
+    expect(onResize).toHaveBeenLastCalledWith({ cols: 120, rows: 36 });
+
+    // An observer notification with the same grid must not resize the shell again.
+    act(() => mockResizeObserverCallback?.());
+    flushAnimationFrames();
+    expect(mockFitFn).toHaveBeenCalledTimes(3);
+    expect(onResize).toHaveBeenCalledTimes(2);
+
+    // A row-only change is still propagated.
+    terminal.rows = 35;
+    act(() => mockResizeObserverCallback?.());
+    flushAnimationFrames();
+    expect(onResize).toHaveBeenCalledTimes(3);
+    expect(onResize).toHaveBeenLastCalledWith({ cols: 120, rows: 35 });
+  });
+
+  it("exposes a focusable resize separator with an accessible name", () => {
+    render(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+
+    const separator = screen.getByRole("separator", { name: "Resize preview and terminal" });
+    expect(separator.getAttribute("tabindex")).toBe("0");
+  });
+
+  it("keeps terminal actions reachable in a wrapping toolbar", () => {
+    render(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+
+    const toolbar = screen.getByTestId("terminal-toolbar");
+    expect(toolbar.className).toContain("flex-wrap");
+    expect(screen.getByRole("button", { name: "Interrupt foreground process" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Clear terminal" })).toBeDefined();
   });
 
   // Test 1 — Accessible clear control

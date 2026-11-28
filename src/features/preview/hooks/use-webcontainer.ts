@@ -144,6 +144,10 @@ export const useWebContainer = ({
   // Resize active shell process when terminal dimensions change
   const resizeTerminal = useCallback((dimensions: { cols: number; rows: number }) => {
     if (dimensions.cols <= 0 || dimensions.rows <= 0) return;
+
+    const previous = terminalDimensionsRef.current;
+    if (previous.cols === dimensions.cols && previous.rows === dimensions.rows) return;
+
     terminalDimensionsRef.current = dimensions;
     try {
       shellProcessRef.current?.resize(dimensions);
