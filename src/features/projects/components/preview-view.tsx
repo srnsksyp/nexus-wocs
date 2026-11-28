@@ -224,16 +224,17 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
           </Panel>
 
           {showTerminal && (
-            <>
-              <Separator
-                aria-label="Resize preview and terminal"
-                className="relative z-10 flex h-3 w-full cursor-row-resize touch-none items-center justify-center border-y border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-              >
-                <div aria-hidden="true" className="flex h-2 w-10 items-center justify-center rounded-full bg-border">
-                  <GripHorizontalIcon className="size-3.5" />
-                </div>
-              </Separator>
-              <Panel defaultSize="35%" minSize="100px" maxSize="500px" className="min-h-0">
+            <Separator
+              aria-label="Resize preview and terminal"
+              className="relative z-10 flex h-3 w-full cursor-row-resize touch-none items-center justify-center border-y border-border/70 bg-muted/60 text-muted-foreground transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            >
+              <div aria-hidden="true" className="flex h-2 w-10 items-center justify-center rounded-full bg-border">
+                <GripHorizontalIcon className="size-3.5" />
+              </div>
+            </Separator>
+          )}
+          {showTerminal && (
+            <Panel defaultSize="35%" minSize="100px" maxSize="500px" className="min-h-0">
               <div className="h-full flex flex-col bg-background border-t">
                 <div
                   data-testid="terminal-toolbar"
@@ -273,8 +274,7 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
                   onClearRef={clearTerminalRef}
                 />
               </div>
-              </Panel>
-            </>
+            </Panel>
           )}
         </Group>
       </div>
