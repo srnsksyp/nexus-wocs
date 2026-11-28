@@ -111,6 +111,31 @@ describe("PreviewView — Stale-preview indicator and sync state (Issue #133)", 
     expect(retryBtn).toHaveProperty("disabled", false);
   });
 
+  it("shows the actionable synchronization error in an accessible alert", () => {
+    mockUseWebContainerReturn.syncError =
+      'Couldn\'t write the file "src/index.ts" to the preview.';
+    mockUseWebContainerReturn.isStale = true;
+    render(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Preview synchronization failed");
+    expect(alert).toHaveTextContent('Couldn\'t write the file "src/index.ts" to the preview.');
+    expect(alert).toHaveTextContent("The preview may be out of date.");
+    expect(screen.getByRole("button", { name: "Retry sync" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
+  });
+
+  it("keeps boot/install errors in the container restart state, not the sync alert", () => {
+    mockUseWebContainerReturn.status = "error";
+    mockUseWebContainerReturn.error = "npm install failed";
+    mockUseWebContainerReturn.syncError = null;
+    render(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+
+    expect(screen.getByText("npm install failed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restart" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("disables retry button while a sync attempt is currently in progress", () => {
     mockUseWebContainerReturn.syncError = "Previous sync failed";
     mockUseWebContainerReturn.isSyncing = true;
