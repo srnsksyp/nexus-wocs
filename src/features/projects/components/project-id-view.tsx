@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Allotment } from "allotment";
 import { FileIcon } from "@react-symbols/icons/utils";
+import { Loader2Icon, RefreshCwIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { EditorView } from "@/features/editor/components/editor-view";
@@ -11,6 +13,7 @@ import { useFiles } from "@/features/projects/hooks/use-files";
 import { useProject } from "@/features/projects/hooks/use-projects";
 import { useSelectedProjectStore } from "../store/use-selected-project-store";
 import { getFilePath } from "@/features/preview/utils/file-tree";
+import { usePreviewRestartStore } from "@/features/preview/store/use-preview-restart-store";
 import {
   CommandDialog,
   CommandEmpty,
@@ -18,6 +21,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
+  CommandShortcut,
 } from "@/components/ui/command";
 
 import { FileExplorer } from "./file-explorer";
@@ -173,6 +178,24 @@ export const ProjectIdView = ({
     setSearchQuery("");
   };
 
+  const previewRestartState = usePreviewRestartStore();
+  const isCurrentProjectPreview = previewRestartState.projectId === projectId;
+  const isPreviewRestarting =
+    isCurrentProjectPreview &&
+    (previewRestartState.status === "booting" || previewRestartState.status === "installing");
+  const isPreviewRestartAvailable =
+    isCurrentProjectPreview && typeof previewRestartState.restart === "function";
+
+  const handleRestartPreview = () => {
+    if (isPreviewRestarting || !isPreviewRestartAvailable) {
+      return;
+    }
+    setQuickOpen(false);
+    setSearchQuery("");
+    previewRestartState.restart?.();
+    toast.success("Restarting preview...");
+  };
+
   const views: Array<"editor" | "preview"> = ["editor", "preview"];
 
   const handleKeyDown = (
@@ -286,7 +309,7 @@ export const ProjectIdView = ({
           if (!open) setSearchQuery("");
         }}
         title="Quick Open"
-        description="Search files by name or path"
+        description="Search files and project commands"
       >
         <CommandInput
           placeholder="Search files by name or path..."
@@ -294,32 +317,55 @@ export const ProjectIdView = ({
           onValueChange={setSearchQuery}
         />
         <CommandList>
+          <CommandEmpty>No results found.</CommandEmpty>
+          {projectId && (
+            <CommandGroup heading="Actions">
+              <CommandItem
+                value="restart preview reload webcontainer run rerun refresh container"
+                disabled={isPreviewRestarting || !isPreviewRestartAvailable}
+                onSelect={handleRestartPreview}
+                className="flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  {isPreviewRestarting ? (
+                    <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+                  ) : (
+                    <RefreshCwIcon className="size-4 text-muted-foreground" />
+                  )}
+                  <span className="font-medium text-sm">
+                    {isPreviewRestarting
+                      ? "Restarting Preview..."
+                      : !isPreviewRestartAvailable
+                        ? "Restart Preview (Unavailable)"
+                        : "Restart Preview"}
+                  </span>
+                </div>
+                <CommandShortcut>Actions</CommandShortcut>
+              </CommandItem>
+            </CommandGroup>
+          )}
+          {fileItems !== null && fileItems.length > 0 && <CommandSeparator />}
           {fileItems === null ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
               Loading files...
             </div>
-          ) : fileItems.length === 0 ? (
-            <CommandEmpty>No files in project.</CommandEmpty>
-          ) : (
-            <>
-              <CommandEmpty>No matching files found.</CommandEmpty>
-              <CommandGroup heading="Files">
-                {fileItems.map((file) => (
-                  <CommandItem
-                    key={file.id}
-                    value={file.searchValue}
-                    onSelect={() => handleSelectFile(file.id)}
-                    className="flex items-center gap-2"
-                  >
-                    <FileIcon fileName={file.name} autoAssign className="size-4 shrink-0" />
-                    <div className="flex items-baseline gap-2 overflow-hidden truncate">
-                      <span className="font-medium text-sm truncate">{file.name}</span>
-                      <span className="text-xs text-muted-foreground truncate">{file.path}</span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
+          ) : fileItems.length === 0 ? null : (
+            <CommandGroup heading="Files">
+              {fileItems.map((file) => (
+                <CommandItem
+                  key={file.id}
+                  value={file.searchValue}
+                  onSelect={() => handleSelectFile(file.id)}
+                  className="flex items-center gap-2"
+                >
+                  <FileIcon fileName={file.name} autoAssign className="size-4 shrink-0" />
+                  <div className="flex items-baseline gap-2 overflow-hidden truncate">
+                    <span className="font-medium text-sm truncate">{file.name}</span>
+                    <span className="text-xs text-muted-foreground truncate">{file.path}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
           )}
         </CommandList>
       </CommandDialog>
