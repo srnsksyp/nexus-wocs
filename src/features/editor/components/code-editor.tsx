@@ -27,6 +27,7 @@ interface Props {
   filePath?: string;
   initialValue?: string;
   lineWrapping?: boolean;
+  minimapEnabled?: boolean;
   onChange: (value: string) => void;
   onSave?: () => void;
   conversationId?: Id<"conversations">;
@@ -41,6 +42,7 @@ export const CodeEditor = (props: Props) => {
   const filePath = props.filePath;
   const initialValue = props.initialValue ?? "";
   const lineWrapping = props.lineWrapping ?? false;
+  const minimapEnabled = props.minimapEnabled ?? true;
   const onChange = props.onChange;
   const onSave = props.onSave;
   const conversationId = props.conversationId;
@@ -49,6 +51,7 @@ export const CodeEditor = (props: Props) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const wrapCompartmentRef = useRef<Compartment | null>(null);
+  const minimapCompartmentRef = useRef<Compartment | null>(null);
   const onSaveRef = useRef(onSave);
   const onSelectedCodeRef = useRef(onSelectedCode);
   const conversationIdRef = useRef(conversationId);
@@ -99,11 +102,27 @@ export const CodeEditor = (props: Props) => {
     }
   }, [lineWrapping]);
 
+  // Reconfigure minimap compartment when minimapEnabled prop changes
+  useEffect(() => {
+    const view = viewRef.current;
+    const compartment = minimapCompartmentRef.current;
+    if (view && compartment) {
+      view.dispatch({
+        effects: compartment.reconfigure(
+          minimapEnabled ? minimap() : []
+        ),
+      });
+    }
+  }, [minimapEnabled]);
+
   useEffect(() => {
     if (!editorRef.current) return;
 
     const wrapCompartment = new Compartment();
     wrapCompartmentRef.current = wrapCompartment;
+
+    const minimapCompartment = new Compartment();
+    minimapCompartmentRef.current = minimapCompartment;
 
     const saveKeymap = keymap.of([
       {
@@ -124,6 +143,7 @@ export const CodeEditor = (props: Props) => {
       parent: editorRef.current,
       extensions: [
         wrapCompartment.of(lineWrapping ? EditorView.lineWrapping : []),
+        minimapCompartment.of(minimapEnabled ? minimap() : []),
         saveKeymap,
         oneDark,
         customTheme,
@@ -142,7 +162,6 @@ export const CodeEditor = (props: Props) => {
           (context) => onSelectedCodeRef.current?.(context),
         ),
         keymap.of([indentWithTab]),
-        minimap(),
         indentationMarkers(),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -176,8 +195,9 @@ export const CodeEditor = (props: Props) => {
     return () => {
       view.destroy();
       wrapCompartmentRef.current = null;
+      minimapCompartmentRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialValue and initial lineWrapping are only used for initial setup
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialValue, initial lineWrapping, and initial minimapEnabled are only used for initial setup
   }, [languageExtension]);
 
   return (
