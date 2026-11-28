@@ -147,6 +147,8 @@ Nexus provides built-in repository import and export via GitHub. This uses Clerk
    - Ensure the required scopes (`repo`, `read:user`) are permitted so Nexus can read and push repositories on behalf of the user.
 4. When signed in to Nexus, users can link their GitHub account directly from the navbar or export modal.
 
+For a detailed matrix of GitHub authentication, repository import, and repository export errors, causes, required scopes, and recovery actions, see the [GitHub Import and Export Troubleshooting Matrix](docs/github-import-export-troubleshooting.md).
+
 ---
 
 ### Step 4: Internal Service Key Configuration (`NEXUS_CONVEX_INTERNAL_KEY`)
@@ -281,7 +283,7 @@ npm run build
 
 ### 4. GitHub Import/Export: `GitHub token not found`
 - **Cause:** The signed-in user has not authorized GitHub OAuth through Clerk, or the required OAuth scopes were not requested.
-- **Fix:** Re-authenticate with GitHub via Clerk or re-connect GitHub under your user profile settings in the app.
+- **Fix:** Re-authenticate with GitHub via Clerk or re-connect GitHub under your user profile settings in the app. For comprehensive troubleshooting across all OAuth, import, and export failure modes, see the [GitHub Import and Export Troubleshooting Matrix](docs/github-import-export-troubleshooting.md).
 
 ### 5. WebContainer Cross-Origin Isolation Errors
 - **Cause:** WebContainer requires `SharedArrayBuffer` and WebAssembly threads, which browsers gate behind Cross-Origin Isolation (`window.crossOriginIsolated === true`).

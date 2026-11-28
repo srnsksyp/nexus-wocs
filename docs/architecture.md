@@ -406,6 +406,7 @@ Nexus exposes several Next.js App Router API endpoints under `src/app/api/`. The
 
 #### 6. `POST /api/github/import`
 - **Source:** [`src/app/api/github/import/route.ts`](../src/app/api/github/import/route.ts)
+- **Troubleshooting Guide:** For detailed failure modes, error messages, rate limit handling, and recovery steps, see the [GitHub Import and Export Troubleshooting Matrix](github-import-export-troubleshooting.md).
 - **Purpose:** Imports an external GitHub repository into Nexus by creating a local project and dispatching an asynchronous repository cloning & file population job.
 - **Authentication:** Required (Clerk user session + Clerk GitHub OAuth token).
 - **Authorization & Ownership:** Creates a new project owned by the authenticated `userId`.
