@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -25,7 +25,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { Doc } from "../../../../convex/_generated/dataModel";
-import { useProjectsPartial, useDeleteProject } from "../hooks/use-projects";
+import { useProject, useProjectsPartial, useDeleteProject } from "../hooks/use-projects";
+import { useSelectedProjectStore } from "../store/use-selected-project-store";
 import { DeleteProjectDialog } from "./delete-project-dialog";
 
 const formatTimestamp = (timestamp: number) => {
@@ -54,9 +55,11 @@ interface ProjectsListProps {
 const ContinueCard = ({
   data,
   onDelete,
+  onSelect,
 }: {
   data: Doc<"projects">;
   onDelete: (project: Doc<"projects">) => void;
+  onSelect: (projectId: Id<"projects">) => void;
 }) => {
   return (
     <div className="flex flex-col gap-2">
@@ -67,7 +70,11 @@ const ContinueCard = ({
           asChild
           className="h-auto flex-1 items-start justify-start p-4 bg-transparent border-0 rounded-none flex flex-col gap-2 hover:bg-accent/40"
         >
-          <Link href={`/projects/${data._id}`} className="group flex-1 w-full">
+          <Link
+            href={`/projects/${data._id}`}
+            onClick={() => onSelect(data._id)}
+            className="group flex-1 w-full"
+          >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
                 {getProjectIcon(data)}
@@ -112,14 +119,17 @@ const ContinueCard = ({
 const ProjectItem = ({
   data,
   onDelete,
+  onSelect,
 }: {
   data: Doc<"projects">;
   onDelete: (project: Doc<"projects">) => void;
+  onSelect: (projectId: Id<"projects">) => void;
 }) => {
   return (
     <li className="flex items-center justify-between w-full group py-1">
       <Link
         href={`/projects/${data._id}`}
+        onClick={() => onSelect(data._id)}
         className="text-sm text-foreground/60 font-medium hover:text-foreground flex items-center justify-between flex-1 min-w-0 pr-2"
       >
         <div className="flex items-center gap-2 truncate">
@@ -159,17 +169,30 @@ const ProjectItem = ({
 export const ProjectsList = ({ onViewAll }: ProjectsListProps) => {
   const projects = useProjectsPartial(6);
   const deleteProject = useDeleteProject();
+  const selectedProjectId = useSelectedProjectStore((state) => state.selectedProjectId);
+  const setSelectedProjectId = useSelectedProjectStore((state) => state.setSelectedProjectId);
+  const clearSelectedProjectId = useSelectedProjectStore((state) => state.clearSelectedProjectId);
+  const selectedProject = useProject(selectedProjectId);
 
   const [projectToDelete, setProjectToDelete] = useState<Doc<"projects"> | null>(
     null,
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
+  useEffect(() => {
+    if (selectedProjectId && selectedProject === null) {
+      clearSelectedProjectId(selectedProjectId);
+    }
+  }, [selectedProjectId, selectedProject, clearSelectedProjectId]);
+
   const handleDeleteConfirm = async () => {
     if (!projectToDelete) return;
     setIsDeleting(true);
     try {
       await deleteProject({ id: projectToDelete._id });
+      if (selectedProjectId === projectToDelete._id) {
+        clearSelectedProjectId(projectToDelete._id);
+      }
       toast.success("Project deleted successfully");
       setProjectToDelete(null);
     } catch (error) {
@@ -181,20 +204,26 @@ export const ProjectsList = ({ onViewAll }: ProjectsListProps) => {
     }
   };
 
-  if (projects === undefined) return <Spinner className="size-4 text-ring" />;
+  if (projects === undefined || (selectedProjectId && selectedProject === undefined)) {
+    return <Spinner className="size-4 text-ring" />;
+  }
 
-  const [mostRecent, ...rest] = projects;
+  const continueProject = selectedProject ?? projects[0];
+  const recentProjects = projects.filter(
+    (project) => project._id !== continueProject?._id,
+  );
 
   return (
     <>
       <div className="flex flex-col gap-4">
-        {mostRecent ? (
+        {continueProject ? (
           <ContinueCard
-            data={mostRecent}
+            data={continueProject}
             onDelete={(proj) => setProjectToDelete(proj)}
+            onSelect={setSelectedProjectId}
           />
         ) : null}
-        {rest.length > 0 && (
+        {recentProjects.length > 0 && (
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">
@@ -209,11 +238,12 @@ export const ProjectsList = ({ onViewAll }: ProjectsListProps) => {
               </button>
             </div>
             <ul className="flex flex-col">
-              {rest.map((project) => (
+              {recentProjects.map((project) => (
                 <ProjectItem
                   key={project._id}
                   data={project}
                   onDelete={(proj) => setProjectToDelete(proj)}
+                  onSelect={setSelectedProjectId}
                 />
               ))}
             </ul>

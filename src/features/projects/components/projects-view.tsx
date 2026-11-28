@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSelectedProjectStore } from "../store/use-selected-project-store";
 import { Poppins } from "next/font/google";
 import { SparkleIcon } from "lucide-react";
 import { FaGithub } from "react-icons/fa";
@@ -73,10 +74,15 @@ export const isEditableElement = (target: EventTarget | null): boolean => {
 
 export const ProjectsView = () => {
   const createProject = useCreateProject();
+  const rehydrateSelectedProject = useSelectedProjectStore.persist.rehydrate;
 
   const [commandDialogOpen, setCommandDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
+
+  useEffect(() => {
+    void rehydrateSelectedProject();
+  }, [rehydrateSelectedProject]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

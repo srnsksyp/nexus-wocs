@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { EditorView } from "@/features/editor/components/editor-view";
 import { useEditor } from "@/features/editor/hooks/use-editor";
 import { useFiles } from "@/features/projects/hooks/use-files";
+import { useProject } from "@/features/projects/hooks/use-projects";
+import { useSelectedProjectStore } from "../store/use-selected-project-store";
 import { getFilePath } from "@/features/preview/utils/file-tree";
 import {
   CommandDialog,
@@ -79,6 +81,20 @@ export const ProjectIdView = ({
 
   const { openFile } = useEditor(projectId);
   const files = useFiles(projectId);
+  const project = useProject(projectId);
+  const setSelectedProjectId = useSelectedProjectStore((state) => state.setSelectedProjectId);
+  const clearSelectedProjectId = useSelectedProjectStore((state) => state.clearSelectedProjectId);
+
+  useEffect(() => {
+    if (project === undefined) return;
+
+    if (project === null) {
+      clearSelectedProjectId(projectId);
+      return;
+    }
+
+    setSelectedProjectId(projectId);
+  }, [project, projectId, setSelectedProjectId, clearSelectedProjectId]);
 
   // Close and reset quick open when projectId changes during render (recommended by React docs over useEffect)
   if (projectId !== prevProjectId) {
