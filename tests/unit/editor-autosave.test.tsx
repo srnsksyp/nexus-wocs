@@ -17,6 +17,7 @@ vi.mock("@/features/editor/components/code-editor", () => ({
   CodeEditor: ({
     fileName,
     lineWrapping,
+    minimapEnabled,
     onChange,
     onSave,
     onCursorPositionChange,
@@ -24,6 +25,7 @@ vi.mock("@/features/editor/components/code-editor", () => ({
     fileName: string;
     initialValue?: string;
     lineWrapping?: boolean;
+    minimapEnabled?: boolean;
     onChange: (value: string) => void;
     onSave?: () => void;
     onCursorPositionChange?: (position: { line: number; column: number }) => void;
@@ -38,6 +40,7 @@ vi.mock("@/features/editor/components/code-editor", () => ({
         data-testid="mock-code-editor"
         data-filename={fileName}
         data-linewrapping={lineWrapping ? "true" : "false"}
+        data-minimap={minimapEnabled ? "true" : "false"}
       >
         <input
           data-testid="editor-input"

@@ -1,11 +1,12 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangleIcon, CheckIcon, RefreshCwIcon, SaveIcon, WrapTextIcon } from "lucide-react";
+import { AlertTriangleIcon, CheckIcon, MapIcon, RefreshCwIcon, SaveIcon, WrapTextIcon } from "lucide-react";
 
 import { useFile, useUpdateFile } from "@/features/projects/hooks/use-files";
 
 import { CodeEditor, type CursorPosition } from "./code-editor";
 import { useEditor } from "../hooks/use-editor";
+import { useEditorPreferences } from "../hooks/use-editor-preferences";
 import { TopNavigation } from "./top-navigation";
 import { FileBreadcrumbs } from "./file-breadcrumbs";
 import { Id } from "../../../../convex/_generated/dataModel";
@@ -36,9 +37,15 @@ export const EditorView = ({
     hasDirtyTabs,
   } = useEditor(projectId);
 
+  const {
+    lineWrapping,
+    minimapEnabled,
+    toggleLineWrapping,
+    toggleMinimap,
+  } = useEditorPreferences();
+
   const activeFile = useFile(activeTabId);
   const updateFile = useUpdateFile();
-  const [lineWrapping, setLineWrapping] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ line: 1, column: 1 });
   const autosaveTimersRef = useRef<Map<Id<"files">, NodeJS.Timeout>>(new Map());
 
@@ -163,7 +170,23 @@ export const EditorView = ({
           <Button
             variant="ghost"
             size="xs"
-            onClick={() => setLineWrapping((prev) => !prev)}
+            onClick={toggleMinimap}
+            aria-label="Minimap"
+            aria-pressed={minimapEnabled}
+            title={minimapEnabled ? "Disable minimap" : "Enable minimap"}
+            className={`h-5 px-1.5 text-xs transition-colors ${
+              minimapEnabled
+                ? "bg-accent text-accent-foreground hover:bg-accent/80"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <MapIcon className="size-3" />
+            <span>Minimap</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={toggleLineWrapping}
             aria-label="Line wrapping"
             aria-pressed={lineWrapping}
             title={lineWrapping ? "Disable line wrapping" : "Enable line wrapping"}
@@ -265,6 +288,7 @@ export const EditorView = ({
             fileName={activeFile.name}
             initialValue={editorValue}
             lineWrapping={lineWrapping}
+            minimapEnabled={minimapEnabled}
             onChange={handleBufferChange}
             onSave={handleManualSave}
             conversationId={conversationId}
