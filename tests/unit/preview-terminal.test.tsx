@@ -62,7 +62,7 @@ vi.mock("@/features/preview/components/preview-settings-popover", () => ({
 
 // Mock useWebContainer
 let mockRestart = vi.fn();
-let mockResync = vi.fn();
+const mockResync = vi.fn();
 const mockSendTerminalInput = vi.fn();
 const mockResizeTerminal = vi.fn();
 const mockInterruptForegroundProcess = vi.fn();
@@ -70,9 +70,9 @@ let mockTerminalOutput = "";
 let mockStatus = "ready";
 let mockPreviewUrl: string | null = "http://localhost:3000";
 let mockError: string | null = null;
-let mockIsSyncing = false;
-let mockSyncError: string | null = null;
-let mockIsStale = false;
+const mockIsSyncing = false;
+const mockSyncError: string | null = null;
+const mockIsStale = false;
 
 vi.mock("@/features/preview/hooks/use-webcontainer", () => ({
   useWebContainer: () => ({
@@ -366,7 +366,7 @@ describe("Issue #47 — Accessible Clear-Terminal Control", () => {
       expect(mockToastError).not.toHaveBeenCalled();
     });
 
-    it("rejected clipboard operation displays error toast without crashing", async () => {
+    it("rejected clipboard operation displays actionable error toast without crashing", async () => {
       mockPreviewUrl = "https://preview.nexus.dev/myapp";
       const writeTextMock = vi.fn().mockRejectedValue(new Error("Permission denied"));
       Object.defineProperty(navigator, "clipboard", {
@@ -383,11 +383,13 @@ describe("Issue #47 — Accessible Clear-Terminal Control", () => {
       });
 
       expect(writeTextMock).toHaveBeenCalledTimes(1);
-      expect(mockToastError).toHaveBeenCalledWith("Failed to copy preview URL");
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Couldn't copy the preview URL. Check clipboard permissions or copy it manually."
+      );
       expect(mockToastSuccess).not.toHaveBeenCalled();
     });
 
-    it("missing clipboard support displays error feedback without crashing", async () => {
+    it("missing clipboard support displays actionable fallback feedback without crashing", async () => {
       mockPreviewUrl = "https://preview.nexus.dev/myapp";
       Object.defineProperty(navigator, "clipboard", {
         value: undefined,
@@ -402,8 +404,113 @@ describe("Issue #47 — Accessible Clear-Terminal Control", () => {
         fireEvent.click(copyBtn);
       });
 
-      expect(mockToastError).toHaveBeenCalledWith("Failed to copy preview URL");
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Clipboard access is unavailable. Copy the preview URL manually."
+      );
       expect(mockToastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("suppresses stale success notification if preview URL changes during in-flight clipboard write", async () => {
+      mockPreviewUrl = "https://preview-url-a.nexus.dev";
+      let resolveClipboardWrite!: () => void;
+      const writePromise = new Promise<void>((resolve) => {
+        resolveClipboardWrite = resolve;
+      });
+      const writeTextMock = vi.fn().mockReturnValue(writePromise);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: writeTextMock },
+        configurable: true,
+        writable: true,
+      });
+
+      const { rerender } = render(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+      const copyBtn = screen.getByRole("button", { name: "Copy preview URL" });
+
+      // Start copying URL A
+      act(() => {
+        fireEvent.click(copyBtn);
+      });
+
+      expect(writeTextMock).toHaveBeenCalledWith("https://preview-url-a.nexus.dev");
+
+      // Change preview URL to URL B while write is pending
+      mockPreviewUrl = "https://preview-url-b.nexus.dev";
+      rerender(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+
+      // Now resolve clipboard write for URL A
+      await act(async () => {
+        resolveClipboardWrite();
+      });
+
+      // Because URL A is no longer current, notification should be suppressed to avoid claiming URL B was copied
+      expect(mockToastSuccess).not.toHaveBeenCalled();
+      expect(mockToastError).not.toHaveBeenCalled();
+    });
+
+    it("suppresses stale failure notification if preview URL changes during in-flight clipboard failure", async () => {
+      mockPreviewUrl = "https://preview-url-a.nexus.dev";
+      let rejectClipboardWrite!: (err: Error) => void;
+      const writePromise = new Promise<void>((_, reject) => {
+        rejectClipboardWrite = reject;
+      });
+      const writeTextMock = vi.fn().mockReturnValue(writePromise);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: writeTextMock },
+        configurable: true,
+        writable: true,
+      });
+
+      const { rerender } = render(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+      const copyBtn = screen.getByRole("button", { name: "Copy preview URL" });
+
+      // Start copying URL A
+      act(() => {
+        fireEvent.click(copyBtn);
+      });
+
+      // Change preview URL to URL B
+      mockPreviewUrl = "https://preview-url-b.nexus.dev";
+      rerender(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+
+      // Reject clipboard write for URL A
+      await act(async () => {
+        rejectClipboardWrite(new Error("Permission denied"));
+      });
+
+      // Suppress stale error notification
+      expect(mockToastError).not.toHaveBeenCalled();
+    });
+
+    it("handles rapid URL changes and repeated copy attempts safely", async () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: writeTextMock },
+        configurable: true,
+        writable: true,
+      });
+
+      mockPreviewUrl = "https://preview-rapid-1.nexus.dev";
+      const { rerender } = render(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+      let copyBtn = screen.getByRole("button", { name: "Copy preview URL" });
+
+      await act(async () => {
+        fireEvent.click(copyBtn);
+      });
+      expect(writeTextMock).toHaveBeenCalledWith("https://preview-rapid-1.nexus.dev");
+      expect(mockToastSuccess).toHaveBeenCalledWith("Preview URL copied to clipboard");
+
+      mockToastSuccess.mockClear();
+
+      // Change to URL 2
+      mockPreviewUrl = "https://preview-rapid-2.nexus.dev";
+      rerender(<PreviewView projectId={"proj_1" as Id<"projects">} />);
+      copyBtn = screen.getByRole("button", { name: "Copy preview URL" });
+
+      await act(async () => {
+        fireEvent.click(copyBtn);
+      });
+      expect(writeTextMock).toHaveBeenCalledWith("https://preview-rapid-2.nexus.dev");
+      expect(mockToastSuccess).toHaveBeenCalledWith("Preview URL copied to clipboard");
     });
 
     // Opening

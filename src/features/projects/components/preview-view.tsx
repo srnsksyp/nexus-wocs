@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Allotment } from "allotment";
 import {
   Loader2Icon,
@@ -49,17 +49,31 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
 
   const isLoading = status === "booting" || status === "installing";
 
+  const previewUrlRef = useRef<string | null>(previewUrl);
+  useEffect(() => {
+    previewUrlRef.current = previewUrl;
+  }, [previewUrl]);
+
+  const hasValidPreviewUrl = Boolean(previewUrl && previewUrl.trim());
+
   const handleCopyUrl = async () => {
-    if (!previewUrl) return;
+    const targetUrl = previewUrl?.trim();
+    if (!targetUrl) return;
+
+    if (!navigator?.clipboard?.writeText) {
+      toast.error("Clipboard access is unavailable. Copy the preview URL manually.");
+      return;
+    }
 
     try {
-      if (!navigator?.clipboard?.writeText) {
-        throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(targetUrl);
+      if (previewUrlRef.current?.trim() === targetUrl) {
+        toast.success("Preview URL copied to clipboard");
       }
-      await navigator.clipboard.writeText(previewUrl);
-      toast.success("Preview URL copied to clipboard");
     } catch {
-      toast.error("Failed to copy preview URL");
+      if (previewUrlRef.current?.trim() === targetUrl) {
+        toast.error("Couldn't copy the preview URL. Check clipboard permissions or copy it manually.");
+      }
     }
   };
 
@@ -132,6 +146,7 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
                 className="h-5 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                 title="Copy preview URL"
                 aria-label="Copy preview URL"
+                disabled={!hasValidPreviewUrl}
                 onClick={handleCopyUrl}
               >
                 <CopyIcon className="size-3" />
