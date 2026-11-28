@@ -113,33 +113,34 @@ node --test tests/security-resource-ownership.test.js
 ```
 
 ### Recommended Local Verification Sequence
-Run all quality checks locally before submitting a pull request:
+
+Before opening a pull request, run the contributor preflight from the repository root:
 
 ```bash
-# 1. Run unit test suite
-npm test
-
-# 2. Run standalone regression test suite
-npm run test:regression
-
-# Or run both suites together:
-npm run test:all
-
-# 3. Verify TypeScript type safety
-npm run typecheck
-
-# 4. Verify ESLint rules
-npm run lint
-
-# 5. Verify Next.js production build
-npm run build
+npm run preflight
 ```
 
-> [!TIP]
-> All test commands are designed to be cross-platform and work seamlessly in Windows PowerShell, Windows Command Prompt, macOS, and Linux without requiring shell-specific globs. For detailed inventory of test files, see [tests/README.md](tests/README.md).
+The preflight runs, in order, `npm test`, `npm run test:regression`, `npm run typecheck`, `npm run lint`, and `npm run build`. It is fail-fast: the first non-zero command stops the sequence and makes the preflight exit non-zero. GitHub Actions uses the same command so local and CI verification stay aligned.
+
+The runner uses Node's built-in process API and npm's active CLI entry point, so it does not depend on POSIX shell chaining or `npm.cmd`. Use the same `npm run preflight` invocation in Windows PowerShell, Windows Command Prompt, macOS, and Linux.
+
+#### Focused checks during development
+
+You can still run one check at a time when iterating on a specific area:
+
+```bash
+npm test                              # All Vitest unit tests
+npx vitest run tests/unit/foo.test.tsx # One focused unit test
+npm run test:regression               # Standalone Node regression suite
+npm run typecheck                     # TypeScript validation
+npm run lint                          # Full-project ESLint
+npm run build                         # Production build
+npm run test:all                      # Unit + regression suites only
+```
+
+Special-runtime integration tests documented in [tests/README.md](tests/README.md) remain separate and should be run when working on those subsystems.
 
 ---
-
 ## 💻 Adding or Updating Editor Language Support
 
 Nexus uses CodeMirror 6 for syntax highlighting in the central code editor. Language extensions are dynamically selected based on the active file name. Contributors looking to add a new language mode or update existing extension mappings should follow this workflow:

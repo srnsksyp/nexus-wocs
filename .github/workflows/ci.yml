@@ -13,13 +13,11 @@ permissions:
 
 jobs:
   quality:
-    name: Lint, Typecheck & Test
+    name: Contributor Preflight
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -30,22 +28,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint changed files
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_REF="${{ github.event.pull_request.base.sha }}"
-          else
-            BEFORE="${{ github.event.before }}"
-            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-              BASE_REF="HEAD~1"
-            else
-              BASE_REF="$BEFORE"
-            fi
-          fi
-          npm run lint:changed -- "$BASE_REF"
-
-      - name: Run TypeScript typecheck
-        run: npm run typecheck
-
-      - name: Run automated unit tests
-        run: npm test
+      - name: Run contributor preflight
+        run: npm run preflight
