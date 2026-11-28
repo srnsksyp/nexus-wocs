@@ -201,6 +201,8 @@ Nexus uses `gpt-4.1-mini` via the Vercel AI SDK for ghost text suggestions, quic
 
 Running the full Nexus development environment requires three processes:
 
+For a detailed explanation of how Next.js, Convex, and Inngest communicate during local development, see the [Local Service Topology Guide](docs/local-service-topology.md).
+
 ### Terminal 1: Convex Backend
 ```bash
 npx convex dev
@@ -296,6 +298,7 @@ npm run build
 ## 📖 Further Reading
 
 - [Contributing Guidelines](CONTRIBUTING.md) — Branch conventions, commit style, and PR process.
+- [Local Service Topology Guide](docs/local-service-topology.md) — Local communication flow, service responsibilities, startup order, and troubleshooting for Next.js, Convex, and Inngest.
 - [Architecture Guide](docs/architecture.md) — System design, message lifecycle, and background agent workflows.
 - [WebContainer Browser Compatibility & Deployment Guide](docs/architecture.md#9-webcontainer-browser-compatibility-and-deployment-guide) — Browser support matrices, cross-origin isolation, reverse-proxy setup, and troubleshooting.
 - [Convex Data Model and Mutation Lifecycle](docs/architecture.md#8-convex-data-model-and-mutation-lifecycle) — Convex schema, table reference, ownership authorization, indexes, and cascade deletion rules.

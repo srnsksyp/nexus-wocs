@@ -218,6 +218,8 @@ sequenceDiagram
 
 ## 6. Development vs. Production Deployment Architecture
 
+For an in-depth breakdown of local development processes, communication topologies, startup sequencing, and local troubleshooting, refer to the [Local Service Topology Guide](local-service-topology.md).
+
 | Dimension | Local Development | Production |
 | :--- | :--- | :--- |
 | **Next.js Hosting** | `localhost:3000` via `next dev` | Vercel / Node server container |
