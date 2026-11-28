@@ -257,6 +257,8 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
 
     const reorderedTabs = [...state.openTabs];
     const [movedTabId] = reorderedTabs.splice(fromIndex, 1);
+    if (!movedTabId) return;
+
     const adjustedTargetIndex = reorderedTabs.indexOf(targetFileId);
     const insertionIndex = adjustedTargetIndex + (position === "after" ? 1 : 0);
     reorderedTabs.splice(insertionIndex, 0, movedTabId);

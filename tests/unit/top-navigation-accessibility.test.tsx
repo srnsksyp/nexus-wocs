@@ -777,7 +777,7 @@ describe("TopNavigation drag and keyboard tab reordering (Issue #138)", () => {
     getData: vi.fn(),
     effectAllowed: "none",
     dropEffect: "none",
-  });
+  } as unknown as DataTransfer);
 
   it("drops a tab after its target without activating or closing either tab", () => {
     render(<TopNavigation projectId={"proj_123" as Id<"projects">} />);

@@ -52,7 +52,6 @@ const Tab = ({
   const {
     activeTabId,
     previewTabId,
-    setActiveTab,
     openFile,
     closeTab,
     isFileDirty,
@@ -87,7 +86,7 @@ const Tab = ({
         "flex items-center gap-2 h-8.75 pl-2 pr-1.5 cursor-pointer text-muted-foreground group border-y border-x border-transparent hover:bg-accent/30 outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset",
         isActive &&
           "bg-background text-foreground border-x-border border-b-background -mb-px drop-shadow",
-        isFirst && "border-l-transparent!",
+        isFirst && dropPosition !== "before" && "border-l-transparent!",
         dropPosition === "before" && "border-l-2 border-l-primary",
         dropPosition === "after" && "border-r-2 border-r-primary"
       )}
