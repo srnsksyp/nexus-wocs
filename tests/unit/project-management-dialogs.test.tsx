@@ -147,6 +147,8 @@ describe("GitHub import dialog", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Unable to import repository");
+    expect(alert).toHaveAttribute("id", "github-import-request-error");
+    expect(input).toHaveAttribute("aria-describedby", "github-import-request-error");
     expect(input).toHaveValue(url);
     await waitFor(() => expect(input).toBeEnabled());
     expect(screen.getByRole("button", { name: "Import" })).toBeEnabled();
@@ -204,7 +206,10 @@ describe("GitHub import dialog", () => {
     fireEvent.submit(input.closest("form")!);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Your GitHub account is not connected");
-    expect(screen.getByRole("button", { name: "Connect GitHub" })).toBeInTheDocument();
+    const connectButton = screen.getByRole("button", { name: "Connect GitHub" });
+    expect(connectButton).toBeInTheDocument();
+    fireEvent.click(connectButton);
+    expect(mockOpenUserProfile).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(input).toBeEnabled());
     expect(onOpenChange).not.toHaveBeenCalled();
   });
