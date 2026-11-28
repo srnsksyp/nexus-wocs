@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 
 import { useFile } from "@/features/projects/hooks/use-files";
@@ -27,12 +27,26 @@ const Tab = ({
   projectId,
   tabRef,
   onKeyDown,
+  onTabClick,
+  onTabPointerDown,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  dropPosition,
 }: {
   fileId: Id<"files">;
   isFirst: boolean;
   projectId: Id<"projects">;
   tabRef?: (el: HTMLDivElement | null) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>, fileId: Id<"files">) => void;
+  onTabClick: (e: React.MouseEvent<HTMLDivElement>, fileId: Id<"files">) => void;
+  onTabPointerDown: () => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, fileId: Id<"files">) => void;
+  onDragOver: (e: React.DragEvent<HTMLDivElement>, fileId: Id<"files">) => void;
+  onDrop: (e: React.DragEvent<HTMLDivElement>, fileId: Id<"files">) => void;
+  onDragEnd: () => void;
+  dropPosition?: "before" | "after" | null;
 }) => {
   const file = useFile(fileId);
   const {
@@ -56,17 +70,26 @@ const Tab = ({
   return (
     <div
       ref={tabRef}
+      draggable
+      onPointerDown={onTabPointerDown}
+      onDragStart={(e) => onDragStart(e, fileId)}
+      onDragOver={(e) => onDragOver(e, fileId)}
+      onDrop={(e) => onDrop(e, fileId)}
+      onDragEnd={onDragEnd}
       role="tab"
       aria-selected={isActive}
       tabIndex={isActive ? 0 : -1}
-      onClick={() => setActiveTab(fileId)}
+      aria-keyshortcuts="Control+Shift+ArrowLeft Control+Shift+ArrowRight Meta+Shift+ArrowLeft Meta+Shift+ArrowRight"
+      onClick={(e) => onTabClick(e, fileId)}
       onDoubleClick={() => openFile(fileId, { pinned: true })}
       onKeyDown={(e) => onKeyDown(e, fileId)}
       className={cn(
         "flex items-center gap-2 h-8.75 pl-2 pr-1.5 cursor-pointer text-muted-foreground group border-y border-x border-transparent hover:bg-accent/30 outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset",
         isActive &&
           "bg-background text-foreground border-x-border border-b-background -mb-px drop-shadow",
-        isFirst && "border-l-transparent!"
+        isFirst && "border-l-transparent!",
+        dropPosition === "before" && "border-l-2 border-l-primary",
+        dropPosition === "after" && "border-r-2 border-r-primary"
       )}
     >
       {file === undefined ? (
@@ -98,6 +121,7 @@ const Tab = ({
         />
       ) : null}
       <button
+        draggable={false}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -128,9 +152,79 @@ export const TopNavigation = ({
 }: { 
   projectId: Id<"projects">
 }) => {
-  const { openTabs, activeTabId, setActiveTab, closeTab, closeAllTabs, hasDirtyTabs } = useEditor(projectId);
+  const { openTabs, activeTabId, setActiveTab, closeTab, closeAllTabs, hasDirtyTabs, reorderTabs } = useEditor(projectId);
   const tabElementsRef = useRef<Map<Id<"files">, HTMLDivElement | null>>(new Map());
+  const draggedTabIdRef = useRef<Id<"files"> | null>(null);
+  const suppressNextClickRef = useRef(false);
+  const [dropTarget, setDropTarget] = useState<{ fileId: Id<"files">; position: "before" | "after" } | null>(null);
+  const [reorderAnnouncement, setReorderAnnouncement] = useState("");
+  const reorderInstructionsId = useId();
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const handleTabClick = (e: React.MouseEvent<HTMLDivElement>, fileId: Id<"files">) => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    setActiveTab(fileId);
+  };
+
+  const handleTabPointerDown = () => {
+    // A real pointer sequence after a drag starts a fresh click interaction.
+    suppressNextClickRef.current = false;
+  };
+
+  const handleTabDragStart = (e: React.DragEvent<HTMLDivElement>, fileId: Id<"files">) => {
+    if (e.target instanceof Element && e.target.closest("button")) {
+      e.preventDefault();
+      return;
+    }
+    draggedTabIdRef.current = fileId;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", fileId);
+    setDropTarget(null);
+  };
+
+  const handleTabDragOver = (e: React.DragEvent<HTMLDivElement>, fileId: Id<"files">) => {
+    const draggedFileId = draggedTabIdRef.current;
+    if (!draggedFileId || draggedFileId === fileId) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const bounds = e.currentTarget.getBoundingClientRect();
+    const position = e.clientX < bounds.left + bounds.width / 2 ? "before" : "after";
+    setDropTarget((current) =>
+      current?.fileId === fileId && current.position === position
+        ? current
+        : { fileId, position }
+    );
+  };
+
+  const handleTabDrop = (e: React.DragEvent<HTMLDivElement>, fileId: Id<"files">) => {
+    const draggedFileId = draggedTabIdRef.current;
+    if (!draggedFileId || draggedFileId === fileId) return;
+
+    e.preventDefault();
+    const bounds = e.currentTarget.getBoundingClientRect();
+    const position = e.clientX < bounds.left + bounds.width / 2 ? "before" : "after";
+    const remainingTabs = openTabs.filter((tabId) => tabId !== draggedFileId);
+    const targetIndex = remainingTabs.indexOf(fileId);
+    if (targetIndex !== -1) {
+      const nextIndex = targetIndex + (position === "after" ? 1 : 0);
+      reorderTabs(draggedFileId, fileId, position);
+      setReorderAnnouncement(`Moved tab to position ${nextIndex + 1} of ${openTabs.length}.`);
+      suppressNextClickRef.current = true;
+    }
+    setDropTarget(null);
+  };
+
+  const handleTabDragEnd = () => {
+    if (draggedTabIdRef.current) suppressNextClickRef.current = true;
+    draggedTabIdRef.current = null;
+    setDropTarget(null);
+  };
 
   const handleCloseAllClick = () => {
     if (hasDirtyTabs()) {
@@ -184,6 +278,19 @@ export const TopNavigation = ({
       const currentIndex = openTabs.indexOf(fileId);
       if (currentIndex === -1) return;
 
+      // Ctrl/Cmd + Shift + ArrowLeft/ArrowRight reorders the focused tab.
+      // Plain arrow keys continue to provide the existing roving-focus behavior.
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        const targetIndex = currentIndex + (e.key === "ArrowLeft" ? -1 : 1);
+        const targetFileId = openTabs[targetIndex];
+        if (targetFileId) {
+          reorderTabs(fileId, targetFileId, e.key === "ArrowLeft" ? "before" : "after");
+          setReorderAnnouncement(`Moved tab to position ${targetIndex + 1} of ${openTabs.length}.`);
+        }
+        return;
+      }
+
       let targetIndex = -1;
 
       switch (e.key) {
@@ -220,14 +327,18 @@ export const TopNavigation = ({
         }
       }
     },
-    [openTabs, setActiveTab]
+    [openTabs, setActiveTab, reorderTabs]
   );
 
   return (
     <>
       <div className="flex items-center border-b bg-sidebar">
         <ScrollArea className="flex-1">
-          <nav role="tablist" aria-label="Open files" className="flex items-center h-8.75">
+          <span id={reorderInstructionsId} className="sr-only">
+            Drag tabs to reorder them. Or use Control or Command plus Shift and the Left or Right Arrow key to move the focused tab.
+          </span>
+          <div role="status" aria-live="polite" className="sr-only">{reorderAnnouncement}</div>
+          <nav role="tablist" aria-label="Open files" aria-describedby={reorderInstructionsId} className="flex items-center h-8.75">
             {openTabs.map((fileId, index) => (
               <Tab
                 key={fileId}
@@ -242,6 +353,13 @@ export const TopNavigation = ({
                   }
                 }}
                 onKeyDown={handleTabKeyDown}
+                onTabClick={handleTabClick}
+                onTabPointerDown={handleTabPointerDown}
+                onDragStart={handleTabDragStart}
+                onDragOver={handleTabDragOver}
+                onDrop={handleTabDrop}
+                onDragEnd={handleTabDragEnd}
+                dropPosition={dropTarget?.fileId === fileId ? dropTarget.position : null}
               />
             ))}
           </nav>

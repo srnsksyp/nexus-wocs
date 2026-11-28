@@ -39,6 +39,7 @@ const mockCloseTab = vi.fn();
 const mockCloseAllTabs = vi.fn();
 const mockSetActiveTab = vi.fn();
 const mockOpenFile = vi.fn();
+const mockReorderTabs = vi.fn();
 const mockHasDirtyTabs = vi.fn(() => false);
 
 let mockOpenTabs: string[] = ["file_1", "file_2"];
@@ -53,6 +54,7 @@ vi.mock("@/features/editor/hooks/use-editor", () => ({
     openFile: mockOpenFile,
     closeTab: mockCloseTab,
     closeAllTabs: mockCloseAllTabs,
+    reorderTabs: mockReorderTabs,
     isFileDirty: () => false,
     hasDirtyTabs: mockHasDirtyTabs,
     getTabData: () => undefined,
@@ -759,5 +761,98 @@ describe("TopNavigation Close All Tabs Control (Issue #73)", () => {
     await waitFor(() => {
       expect(screen.queryByText("Close all tabs?")).toBeNull();
     });
+  });
+});
+
+
+describe("TopNavigation drag and keyboard tab reordering (Issue #138)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOpenTabs = ["file_1", "file_2", "file_3"];
+    mockActiveTabId = "file_1";
+  });
+
+  const dataTransfer = () => ({
+    setData: vi.fn(),
+    getData: vi.fn(),
+    effectAllowed: "none",
+    dropEffect: "none",
+  });
+
+  it("drops a tab after its target without activating or closing either tab", () => {
+    render(<TopNavigation projectId={"proj_123" as Id<"projects">} />);
+    const tabs = screen.getAllByRole("tab");
+    vi.spyOn(tabs[1], "getBoundingClientRect").mockReturnValue({
+      left: 0, right: 100, width: 100, top: 0, bottom: 32, height: 32, x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(tabs[0], { dataTransfer: transfer });
+    fireEvent.dragOver(tabs[1], { dataTransfer: transfer, clientX: 75 });
+    fireEvent.drop(tabs[1], { dataTransfer: transfer, clientX: 75 });
+    fireEvent.dragEnd(tabs[0]);
+    fireEvent.click(tabs[0]);
+
+    expect(mockReorderTabs).toHaveBeenCalledWith("file_1", "file_2", "after");
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+    expect(mockCloseTab).not.toHaveBeenCalled();
+  });
+
+  it("drops a tab before its target when released on the left half", () => {
+    render(<TopNavigation projectId={"proj_123" as Id<"projects">} />);
+    const tabs = screen.getAllByRole("tab");
+    vi.spyOn(tabs[0], "getBoundingClientRect").mockReturnValue({
+      left: 0, right: 100, width: 100, top: 0, bottom: 32, height: 32, x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(tabs[2], { dataTransfer: transfer });
+    fireEvent.dragOver(tabs[0], { dataTransfer: transfer, clientX: 25 });
+    fireEvent.drop(tabs[0], { dataTransfer: transfer, clientX: 25 });
+    fireEvent.dragEnd(tabs[2]);
+
+    expect(mockReorderTabs).toHaveBeenCalledWith("file_3", "file_1", "before");
+  });
+
+  it("does not reorder tabs when a drag is cancelled", () => {
+    render(<TopNavigation projectId={"proj_123" as Id<"projects">} />);
+    const tabs = screen.getAllByRole("tab");
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(tabs[0], { dataTransfer: transfer });
+    fireEvent.dragEnd(tabs[0]);
+    fireEvent.click(tabs[0]);
+
+    expect(mockReorderTabs).not.toHaveBeenCalled();
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+  });
+
+  it("moves the focused tab with Ctrl/Cmd+Shift+Arrow and keeps plain arrows for focus navigation", () => {
+    render(<TopNavigation projectId={"proj_123" as Id<"projects">} />);
+    const tabs = screen.getAllByRole("tab");
+    const reorderEvent = new KeyboardEvent("keydown", {
+      key: "ArrowLeft",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventDefault = vi.spyOn(reorderEvent, "preventDefault");
+
+    act(() => {
+      tabs[1].dispatchEvent(reorderEvent);
+    });
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(mockReorderTabs).toHaveBeenCalledWith("file_2", "file_1", "before");
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    tabs[0].focus();
+    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(mockReorderTabs).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,13 @@ export const useEditor = (projectId: Id<"projects">) => {
     store.closeAllTabs(projectId);
   }, [store, projectId]);
 
+  const reorderTabs = useCallback(
+    (fileId: Id<"files">, targetFileId: Id<"files">, position: "before" | "after") => {
+      store.reorderTabs(projectId, fileId, targetFileId, position);
+    },
+    [store, projectId]
+  );
+
   const setActiveTab = useCallback(
     (fileId: Id<"files">) => {
       store.setActiveTab(projectId, fileId);
@@ -115,6 +122,7 @@ export const useEditor = (projectId: Id<"projects">) => {
     openFile,
     closeTab,
     closeAllTabs,
+    reorderTabs,
     setActiveTab,
     getTabData,
     isFileDirty,

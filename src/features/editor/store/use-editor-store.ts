@@ -43,6 +43,12 @@ interface EditorStore {
   closeTab: (projectId: Id<"projects">, fileId: Id<"files">) => void;
   closeAllTabs: (projectId: Id<"projects">) => void;
   setActiveTab: (projectId: Id<"projects">, fileId: Id<"files">) => void;
+  reorderTabs: (
+    projectId: Id<"projects">,
+    fileId: Id<"files">,
+    targetFileId: Id<"files">,
+    position: "before" | "after"
+  ) => void;
 
   initFileContent: (
     projectId: Id<"projects">,
@@ -235,6 +241,29 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     const tabs = new Map(get().tabs);
     const state = tabs.get(projectId) ?? defaultTabState;
     tabs.set(projectId, { ...state, activeTabId: fileId });
+    set({ tabs });
+  },
+
+  reorderTabs: (projectId, fileId, targetFileId, position) => {
+    if (fileId === targetFileId) return;
+
+    const tabs = new Map(get().tabs);
+    const state = tabs.get(projectId);
+    if (!state) return;
+
+    const fromIndex = state.openTabs.indexOf(fileId);
+    const targetIndex = state.openTabs.indexOf(targetFileId);
+    if (fromIndex === -1 || targetIndex === -1) return;
+
+    const reorderedTabs = [...state.openTabs];
+    const [movedTabId] = reorderedTabs.splice(fromIndex, 1);
+    const adjustedTargetIndex = reorderedTabs.indexOf(targetFileId);
+    const insertionIndex = adjustedTargetIndex + (position === "after" ? 1 : 0);
+    reorderedTabs.splice(insertionIndex, 0, movedTabId);
+
+    if (reorderedTabs.every((tabId, index) => tabId === state.openTabs[index])) return;
+
+    tabs.set(projectId, { ...state, openTabs: reorderedTabs });
     set({ tabs });
   },
 
