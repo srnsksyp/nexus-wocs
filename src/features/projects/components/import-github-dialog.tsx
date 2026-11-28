@@ -2,6 +2,7 @@ import ky, { HTTPError } from "ky";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useClerk } from "@clerk/nextjs";
 
@@ -34,6 +35,8 @@ export const ImportGithubDialog = ({
 }: ImportGithubDialogProps) => {
   const router = useRouter();
   const { openUserProfile } = useClerk();
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requiresGithubConnection, setRequiresGithubConnection] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -43,6 +46,9 @@ export const ImportGithubDialog = ({
       onSubmit: formSchema,
     },
     onSubmit: async ({ value }) => {
+      setRequestError(null);
+      setRequiresGithubConnection(false);
+
       try {
         const { projectId } = await ky
           .post("/api/github/import", {
@@ -54,6 +60,8 @@ export const ImportGithubDialog = ({
             eventId: string;
           }>()
 
+        setRequestError(null);
+        setRequiresGithubConnection(false);
         toast.success("Importing repository...");
         onOpenChange(false);
         form.reset();
@@ -61,19 +69,23 @@ export const ImportGithubDialog = ({
         router.push(`/projects/${projectId}`);
       } catch (error) {
         if (error instanceof HTTPError) {
-          const body = await error.response.json<{ error: string }>();
-          if (body?.error?.includes("GitHub not connected")) {
-            toast.error("GitHub account not connected", {
-              action: {
-                label: "Connect",
-                onClick: () => openUserProfile(),
-              },
-            });
-            onOpenChange(false);
-            return;
+          try {
+            const body = await error.response.json<{ error?: string }>();
+            if (body?.error?.includes("GitHub not connected")) {
+              setRequiresGithubConnection(true);
+              setRequestError(
+                "Your GitHub account is not connected. Connect it before retrying this import."
+              );
+              return;
+            }
+          } catch {
+            // Fall back to the general import message if the response is not JSON.
           }
         }
-        toast.error("Unable to import repository. Please check the URL and try again");
+
+        setRequestError(
+          "Unable to import repository. Check the URL and your GitHub access, then try again."
+        );
       }
     },
   });
@@ -94,30 +106,50 @@ export const ImportGithubDialog = ({
             form.handleSubmit();
           }}
         >
-          <form.Field name="url">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
+              <form.Field name="url">
+                {(field) => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid;
 
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>
-                    Repository URL
-                  </FieldLabel>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    aria-invalid={isInvalid}
-                    placeholder="https://github.com/owner/repo"
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              );
-            }}
-          </form.Field>
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <FieldLabel htmlFor={field.name}>
+                        Repository URL
+                      </FieldLabel>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        aria-invalid={isInvalid}
+                        aria-describedby={requestError ? "github-import-request-error" : undefined}
+                        disabled={isSubmitting}
+                        placeholder="https://github.com/owner/repo"
+                      />
+                      {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                      {requestError && (
+                        <FieldError id="github-import-request-error">
+                          <span>{requestError}</span>
+                          {requiresGithubConnection && (
+                            <button
+                              type="button"
+                              onClick={() => openUserProfile()}
+                              className="ml-1 underline underline-offset-2"
+                            >
+                              Connect GitHub
+                            </button>
+                          )}
+                        </FieldError>
+                      )}
+                    </Field>
+                  );
+                }}
+              </form.Field>
+            )}
+          </form.Subscribe>
           <DialogFooter className="mt-4">
             <Button
               type="button"
