@@ -298,6 +298,7 @@ npm run build
 ## 📖 Further Reading
 
 - [Contributing Guidelines](CONTRIBUTING.md) — Branch conventions, commit style, and PR process.
+- [WebContainer Preview Settings & Semantics Guide](docs/webcontainer-preview-settings.md) — Reference on default commands, command parsing, environment variable validation, and preview URL detection.
 - [Local Service Topology Guide](docs/local-service-topology.md) — Local communication flow, service responsibilities, startup order, and troubleshooting for Next.js, Convex, and Inngest.
 - [Architecture Guide](docs/architecture.md) — System design, message lifecycle, and background agent workflows.
 - [WebContainer Browser Compatibility & Deployment Guide](docs/architecture.md#9-webcontainer-browser-compatibility-and-deployment-guide) — Browser support matrices, cross-origin isolation, reverse-proxy setup, and troubleshooting.
