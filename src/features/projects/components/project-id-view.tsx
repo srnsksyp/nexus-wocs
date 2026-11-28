@@ -12,6 +12,7 @@ import { useFiles } from "@/features/projects/hooks/use-files";
 import { useProject } from "@/features/projects/hooks/use-projects";
 import { useSelectedProjectStore } from "../store/use-selected-project-store";
 import { getFilePath } from "@/features/preview/utils/file-tree";
+import { usePreviewRestartStore } from "@/features/preview/store/use-preview-restart-store";
 import {
   searchFilesByContent,
 } from "../utils/content-search";
@@ -22,6 +23,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
+  CommandShortcut,
 } from "@/components/ui/command";
 
 import { FileExplorer } from "./file-explorer";
@@ -203,6 +206,24 @@ export const ProjectIdView = ({
     openFile(fileId, { pinned: false });
     setQuickOpen(false);
     setSearchQuery("");
+  };
+
+  const previewRestartState = usePreviewRestartStore();
+  const isCurrentProjectPreview = previewRestartState.projectId === projectId;
+  const isPreviewRestarting =
+    isCurrentProjectPreview &&
+    (previewRestartState.status === "booting" || previewRestartState.status === "installing");
+  const isPreviewRestartAvailable =
+    isCurrentProjectPreview && typeof previewRestartState.restart === "function";
+
+  const handleRestartPreview = () => {
+    if (isPreviewRestarting || !isPreviewRestartAvailable) {
+      return;
+    }
+    setQuickOpen(false);
+    setSearchQuery("");
+    previewRestartState.restart?.();
+    toast.success("Restarting preview...");
   };
 
   const views: Array<"editor" | "preview"> = ["editor", "preview"];

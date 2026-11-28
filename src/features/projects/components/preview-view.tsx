@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 
 import { useWebContainer } from "@/features/preview/hooks/use-webcontainer";
+import { usePreviewRestartStore } from "@/features/preview/store/use-preview-restart-store";
 import { PreviewSettingsPopover } from "@/features/preview/components/preview-settings-popover";
 import { PreviewTerminal } from "@/features/preview/components/preview-terminal";
 
@@ -49,6 +50,21 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
   });
 
   const isLoading = status === "booting" || status === "installing";
+
+  const registerPreview = usePreviewRestartStore((state) => state.registerPreview);
+  const unregisterPreview = usePreviewRestartStore((state) => state.unregisterPreview);
+  const updateStatus = usePreviewRestartStore((state) => state.updateStatus);
+
+  useEffect(() => {
+    registerPreview(projectId, restart, status);
+    return () => {
+      unregisterPreview(projectId);
+    };
+  }, [projectId, restart, status, registerPreview, unregisterPreview]);
+
+  useEffect(() => {
+    updateStatus(projectId, status);
+  }, [projectId, status, updateStatus]);
 
   const previewUrlRef = useRef<string | null>(previewUrl);
   useEffect(() => {
