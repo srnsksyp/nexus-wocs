@@ -172,9 +172,10 @@ export const PreviewView = ({ projectId }: { projectId: Id<"projects"> }) => {
         >
           <AlertTriangleIcon className="size-4 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Preview synchronization failed</p>
+            <p className="text-sm font-medium">Preview may be out of date</p>
             <p className="break-words text-xs">
-              {syncError} The preview may be out of date.
+              <span className="font-medium">Preview synchronization failed:</span>{" "}
+              {syncError}
             </p>
           </div>
           <Button

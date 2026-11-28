@@ -120,7 +120,7 @@ describe("PreviewView — Stale-preview indicator and sync state (Issue #133)", 
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("Preview synchronization failed");
     expect(alert).toHaveTextContent('Couldn\'t write the file "src/index.ts" to the preview.');
-    expect(alert).toHaveTextContent("The preview may be out of date.");
+    expect(alert).toHaveTextContent("Preview may be out of date");
     expect(screen.getByRole("button", { name: "Retry sync" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
   });
