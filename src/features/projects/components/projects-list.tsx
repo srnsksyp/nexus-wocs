@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { Doc } from "../../../../convex/_generated/dataModel";
+import { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { useProject, useProjectsPartial, useDeleteProject } from "../hooks/use-projects";
 import { useSelectedProjectStore } from "../store/use-selected-project-store";
 import { DeleteProjectDialog } from "./delete-project-dialog";

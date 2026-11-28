@@ -209,7 +209,8 @@ describe("selected project navigation (Issue #141)", () => {
     });
   });
 
-  it("does not retain a direct project URL when the project is unavailable", async () => {
+  it("clears a previously selected project when a direct project URL is unavailable", async () => {
+    useSelectedProjectStore.getState().setSelectedProjectId(projectId("missing_project"));
     render(<ProjectIdView projectId={projectId("missing_project")} />);
 
     await waitFor(() => {
