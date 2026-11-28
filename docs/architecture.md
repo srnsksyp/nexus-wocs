@@ -212,6 +212,7 @@ sequenceDiagram
   - `Cross-Origin-Embedder-Policy: credentialless`
   - `Cross-Origin-Opener-Policy: same-origin`
 - This isolates the browser execution environment, satisfies browser security gates for `SharedArrayBuffer`, and prevents cross-origin data leakage while permitting necessary subresources (fonts, images, external previews) without strict CORP headers.
+- For practical details on runtime command parsing, environment variable injection, settings persistence, and preview URL detection, see the [WebContainer Preview Settings & Semantics Guide](webcontainer-preview-settings.md).
 - For complete browser support matrices, reverse-proxy header preservation guidelines, verification checks, and debugging procedures, see [Section 9: WebContainer Browser Compatibility and Deployment Guide](#9-webcontainer-browser-compatibility-and-deployment-guide).
 
 ---
